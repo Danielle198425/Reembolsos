@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body, File, UploadFile
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas, auth
+import storage
 import json
 from datetime import datetime
 
@@ -927,13 +928,17 @@ async def upload_policy_file(
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(400, "Apenas arquivos PDF são permitidos para políticas.")
     
-    os.makedirs("uploads", exist_ok=True)
+    upload_dir = "/tmp/uploads" if (os.environ.get("VERCEL") or not os.path.exists("uploads")) else "uploads"
+    os.makedirs(upload_dir, exist_ok=True)
     safe_filename = f"policy_{int(datetime.utcnow().timestamp())}_{file.filename.replace(' ', '_')}"
-    filepath = os.path.join("uploads", safe_filename)
+    filepath = os.path.join(upload_dir, safe_filename)
     
     content = await file.read()
     with open(filepath, "wb") as f:
         f.write(content)
+        
+    if storage.enabled():
+        storage.upload_file(f"uploads/{safe_filename}", filepath)
         
     return {"filename": safe_filename, "url": f"/uploads/{safe_filename}"}
 

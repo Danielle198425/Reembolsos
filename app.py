@@ -1,8 +1,9 @@
 import os
+import mimetypes
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 from database import engine, Base, SessionLocal, IS_SQLITE
@@ -95,6 +96,7 @@ async def lifespan(app: FastAPI):
             pass
         try:
             storage.ensure_bucket()
+            storage.sync_up_async()
         except Exception:
             pass
         yield
@@ -162,12 +164,92 @@ app.include_router(sienge.router)
 # Static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-upload_dir = "/tmp/uploads" if (IS_VERCEL or not os.path.exists("uploads")) else "uploads"
-try:
-    os.makedirs(upload_dir, exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
-except Exception:
-    pass
+import urllib.parse  # noqa: E402
+
+
+@app.get("/uploads/{file_path:path}", include_in_schema=False)
+async def serve_upload(file_path: str):
+    clean_name = urllib.parse.unquote(file_path).lstrip("/")
+    raw_name = file_path.lstrip("/")
+
+    # 1. Checa em /tmp/uploads (disco de escrita no Vercel)
+    for candidate in (raw_name, clean_name):
+        tmp_path = os.path.join("/tmp/uploads", candidate)
+        if os.path.isfile(tmp_path):
+            return FileResponse(tmp_path)
+
+    # 2. Checa em uploads/ (arquivos empacotados com a aplicação)
+    for candidate in (raw_name, clean_name):
+        local_path = os.path.join("uploads", candidate)
+        if os.path.isfile(local_path):
+            return FileResponse(local_path)
+
+    # 3. Busca no Supabase Storage
+    if storage.enabled():
+        for candidate in (clean_name, raw_name):
+            remote_path = f"uploads/{candidate}"
+            data = storage.download_bytes(remote_path)
+            if data is not None:
+                # Salva em /tmp/uploads para cache local rápido
+                tmp_path = os.path.join("/tmp/uploads", candidate)
+                try:
+                    os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
+                    with open(tmp_path, "wb") as f:
+                        f.write(data)
+                    return FileResponse(tmp_path)
+                except Exception:
+                    pass
+                ctype = mimetypes.guess_type(candidate)[0] or ("application/pdf" if candidate.lower().endswith(".pdf") else "application/octet-stream")
+                fname = os.path.basename(candidate)
+                return Response(
+                    content=data,
+                    media_type=ctype,
+                    headers={"Content-Disposition": f'inline; filename="{fname}"'}
+                )
+
+    return JSONResponse({"detail": "Não encontrado"}, status_code=404)
+
+
+@app.get("/exports/{file_path:path}", include_in_schema=False)
+async def serve_export(file_path: str):
+    clean_name = urllib.parse.unquote(file_path).lstrip("/")
+    raw_name = file_path.lstrip("/")
+
+    # 1. Checa em /tmp/exports
+    for candidate in (raw_name, clean_name):
+        tmp_path = os.path.join("/tmp/exports", candidate)
+        if os.path.isfile(tmp_path):
+            return FileResponse(tmp_path)
+
+    # 2. Checa em exports/
+    for candidate in (raw_name, clean_name):
+        local_path = os.path.join("exports", candidate)
+        if os.path.isfile(local_path):
+            return FileResponse(local_path)
+
+    # 3. Supabase Storage
+    if storage.enabled():
+        for candidate in (clean_name, raw_name):
+            remote_path = f"exports/{candidate}"
+            data = storage.download_bytes(remote_path)
+            if data is not None:
+                tmp_path = os.path.join("/tmp/exports", candidate)
+                try:
+                    os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
+                    with open(tmp_path, "wb") as f:
+                        f.write(data)
+                    return FileResponse(tmp_path)
+                except Exception:
+                    pass
+                ctype = mimetypes.guess_type(candidate)[0] or ("application/pdf" if candidate.lower().endswith(".pdf") else "application/octet-stream")
+                fname = os.path.basename(candidate)
+                return Response(
+                    content=data,
+                    media_type=ctype,
+                    headers={"Content-Disposition": f'inline; filename="{fname}"'}
+                )
+
+    return JSONResponse({"detail": "Não encontrado"}, status_code=404)
 
 
 @app.get("/", include_in_schema=False)
@@ -175,15 +257,12 @@ except Exception:
 async def serve_spa(request: Request, full_path: str = ""):
     """Serve o SPA para qualquer rota não-API."""
     norm_path = full_path.replace("\\", "/")
-    if norm_path.startswith("api/") or norm_path.startswith("static/") or norm_path.startswith("uploads/"):
+    if norm_path.startswith("api/") or norm_path.startswith("static/") or norm_path.startswith("uploads/") or norm_path.startswith("exports/"):
         return JSONResponse({"detail": "Not Found"}, status_code=404)
     index_path = "index.html" if os.path.exists("index.html") else "static/index.html"
     if os.path.exists(index_path):
         return FileResponse(index_path, headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"})
     return JSONResponse({"detail": "Frontend não encontrado"}, status_code=404)
-
-
-import urllib.parse  # noqa: E402
 
 
 class AsgiPathRewrite:
@@ -209,7 +288,7 @@ class AsgiPathRewrite:
                     else:
                         new_p = "/api/" + raw_val
                     scope["path"] = new_p
-                    scope["raw_path"] = new_p.encode("ascii")
+                    scope["raw_path"] = new_p.encode("utf-8")
                     clean_qs = urllib.parse.urlencode([(k, v) for k, vs in params.items() for v in vs])
                     scope["query_string"] = clean_qs.encode("ascii")
         await self.asgi_app(scope, receive, send)

@@ -7,7 +7,6 @@ __pycache__/
 backups/
 backup_projeto_reembolsos.zip
 *.zip
-uploads/
 exports/
 scratch/
 temp.txt

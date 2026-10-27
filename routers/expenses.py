@@ -13,12 +13,13 @@ from sqlalchemy import or_, and_
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas, auth
+import storage
 from pdf_generator import generate_expense_pdf
 from email_service import send_rejection_email
 
 router = APIRouter(prefix="/api/expenses", tags=["expenses"])
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "/tmp/uploads" if (os.environ.get("VERCEL") or not os.path.exists("uploads")) else "uploads"
 
 STATUS_TRANSITIONS = {
     # status_atual -> [roles permitidos] -> novo_status
@@ -796,6 +797,10 @@ async def upload_receipt(
     expense.receipt_path = web_path
     expense.updated_at = datetime.utcnow()
     db.commit()
+
+    if storage.enabled():
+        storage.upload_file(f"uploads/{filename}", filepath)
+
     return {"receipt_path": web_path, "filename": filename}
 
 
@@ -811,9 +816,12 @@ def expense_pdf(
     if not _can_view(expense, current_user):
         raise HTTPException(403, "Acesso negado")
 
-    os.makedirs("exports", exist_ok=True)
-    output_path = f"exports/despesa_{expense_id}.pdf"
+    export_dir = "/tmp/exports" if (os.environ.get("VERCEL") or not os.path.exists("exports")) else "exports"
+    os.makedirs(export_dir, exist_ok=True)
+    output_path = os.path.join(export_dir, f"despesa_{expense_id}.pdf")
     generate_expense_pdf(expense, output_path)
+    if storage.enabled():
+        storage.upload_file(f"exports/despesa_{expense_id}.pdf", output_path)
     return FileResponse(
         output_path,
         media_type="application/pdf",

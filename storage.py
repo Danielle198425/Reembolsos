@@ -119,6 +119,27 @@ def download_all():
         print(f"[storage] falha ao listar bucket: {e}")
 
 
+def download_bytes(path: str):
+    if not enabled():
+        return None
+    try:
+        req = urllib.request.Request(_object_url(path), headers=_headers())
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+    except Exception as e:
+        print(f"[storage] falha ao buscar {path}: {e}")
+        return None
+
+
+def upload_file(remote_path: str, local: str):
+    if not enabled():
+        return
+    try:
+        _upload(remote_path, local)
+    except Exception as e:
+        print(f"[storage] falha ao enviar {remote_path}: {e}")
+
+
 def _upload(path: str, local: str):
     with open(local, "rb") as f:
         data = f.read()
@@ -148,31 +169,40 @@ def sync_up():
     with _lock:
         current = {}
         for d in SYNC_DIRS:
-            if not os.path.isdir(d):
-                continue
-            for root, _dirs, files in os.walk(d):
-                for name in files:
-                    local = os.path.join(root, name)
-                    rel = local.replace(os.sep, "/")
-                    try:
-                        st = os.stat(local)
-                    except OSError:
-                        continue
-                    current[rel] = (st.st_mtime, st.st_size)
-        for rel, sig in current.items():
-            if _synced.get(rel) != sig:
+            dirs_to_scan = [d]
+            tmp_d = os.path.join("/tmp", d)
+            if os.path.isdir(tmp_d):
+                dirs_to_scan.append(tmp_d)
+            for base_dir in dirs_to_scan:
+                if not os.path.isdir(base_dir):
+                    continue
+                for root, _dirs, files in os.walk(base_dir):
+                    for name in files:
+                        local = os.path.join(root, name)
+                        rel_from_base = os.path.relpath(local, base_dir).replace(os.sep, "/")
+                        rel = f"{d}/{rel_from_base}"
+                        try:
+                            st = os.stat(local)
+                        except OSError:
+                            continue
+                        current[rel] = (st.st_mtime, st.st_size, local)
+        for rel, (mtime, size, local_path) in current.items():
+            if _synced.get(rel) != (mtime, size):
                 try:
-                    _upload(rel, rel.replace("/", os.sep))
-                    _synced[rel] = sig
+                    _upload(rel, local_path)
+                    _synced[rel] = (mtime, size)
                 except Exception as e:
                     print(f"[storage] falha ao enviar {rel}: {e}")
-        for rel in [p for p in _synced if p not in current]:
-            try:
-                _delete(rel)
-                _synced.pop(rel, None)
-            except Exception as e:
-                print(f"[storage] falha ao remover {rel}: {e}")
+        # Só remove se não estiver no Vercel (onde arquivos locais podem não existir na lambda)
+        if not os.environ.get("VERCEL"):
+            for rel in [p for p in _synced if p not in current]:
+                try:
+                    _delete(rel)
+                    _synced.pop(rel, None)
+                except Exception as e:
+                    print(f"[storage] falha ao remover {rel}: {e}")
 
 
 def sync_up_async():
     threading.Thread(target=sync_up, daemon=True).start()
+
