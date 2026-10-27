@@ -221,10 +221,17 @@ def send_report_email(
     msg.attach(msg_body)
 
     # Anexa arquivo PDF
-    if pdf_path and os.path.exists(pdf_path):
+    actual_pdf = None
+    if pdf_path:
+        for p in (pdf_path, os.path.join("/tmp", pdf_path.lstrip("/")), os.path.join("/tmp/exports", os.path.basename(pdf_path))):
+            if p and os.path.isfile(p):
+                actual_pdf = p
+                break
+
+    if actual_pdf:
         try:
             from email.mime.application import MIMEApplication
-            with open(pdf_path, "rb") as f:
+            with open(actual_pdf, "rb") as f:
                 pdf_data = f.read()
             pdf_attachment = MIMEApplication(pdf_data, _subtype="pdf")
             safe_name = "".join(c for c in report_name if c.isalnum() or c in (" ", "-", "_", ".")).strip()
@@ -233,7 +240,7 @@ def send_report_email(
             pdf_attachment.add_header("Content-Disposition", "attachment", filename=safe_name)
             msg.attach(pdf_attachment)
         except Exception as e:
-            logger.error(f"Erro ao anexar arquivo PDF '{pdf_path}': {e}")
+            logger.error(f"Erro ao anexar arquivo PDF '{actual_pdf}': {e}")
 
     if not SMTP_HOST:
         logger.info(

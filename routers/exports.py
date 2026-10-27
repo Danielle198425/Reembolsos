@@ -3,14 +3,18 @@ import json
 from typing import Optional
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session, joinedload
 from database import get_db
 import models, schemas, auth
+import storage
 from pdf_generator import generate_export_pdf
 from email_service import send_report_email
 
 router = APIRouter(prefix="/api/exports", tags=["exports"])
+
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+EXPORT_DIR = "/tmp/exports" if (IS_VERCEL or not os.path.exists("exports")) else "exports"
 
 
 @router.get("")
@@ -106,18 +110,21 @@ def create_export(
             exp.finalized_by = current_user.id
 
     if not expenses:
-        # Nenhum registro encontrado, gerar relatório vazio padrão
-        os.makedirs("exports", exist_ok=True)
+        os.makedirs(EXPORT_DIR, exist_ok=True)
         timestamp = int(now_utc.timestamp())
-        filename = f"exports/exportacao_{timestamp}.pdf"
-        generate_export_pdf(expenses, body.name, filename, generator_name=current_user.name, view_mode=sort_key)
+        file_basename = f"exportacao_{timestamp}.pdf"
+        abs_filepath = os.path.join(EXPORT_DIR, file_basename)
+        rel_filename = f"exports/{file_basename}"
+        generate_export_pdf(expenses, body.name, abs_filepath, generator_name=current_user.name, view_mode=sort_key)
+        if storage.enabled():
+            storage.upload_file(rel_filename, abs_filepath)
         export = models.Export(
             name=body.name,
             created_by=current_user.id,
             target_user_id=None,
             expense_user_ids=None,
             export_type="Padrão",
-            file_path=filename,
+            file_path=rel_filename,
         )
         db.add(export)
         db.commit()
@@ -145,7 +152,7 @@ def create_export(
     now_local = datetime.now()
     default_month_str = f"{MONTHS_PT[now_local.month]} de {now_local.year}"
 
-    os.makedirs("exports", exist_ok=True)
+    os.makedirs(EXPORT_DIR, exist_ok=True)
     timestamp = int(now_utc.timestamp())
     created_exports = []
 
@@ -204,17 +211,22 @@ def create_export(
                 # Sempre inclui o nome da empresa no relatório para padronização e identificação visual na tela
                 export_record_name = f"{base_user_report} - {g_comp_name}"
 
-                filename = f"exports/exportacao_{timestamp}_{file_idx}.pdf"
+                file_basename = f"exportacao_{timestamp}_{file_idx}.pdf"
+                rel_filename = f"exports/{file_basename}"
+                abs_filepath = os.path.join(EXPORT_DIR, file_basename)
                 file_idx += 1
 
                 generate_export_pdf(
                     g_expenses,
                     base_user_report,
-                    filename,
+                    abs_filepath,
                     generator_name=current_user.name,
                     company_name=g_comp_name,
                     view_mode=sort_key
                 )
+
+                if storage.enabled():
+                    storage.upload_file(rel_filename, abs_filepath)
 
                 export = models.Export(
                     name=export_record_name,
@@ -222,7 +234,7 @@ def create_export(
                     target_user_id=uid if uid else None,
                     expense_user_ids=json.dumps([uid]) if uid else None,
                     export_type="Massa",
-                    file_path=filename,
+                    file_path=rel_filename,
                 )
                 db.add(export)
                 db.commit()
@@ -263,22 +275,28 @@ def create_export(
 
             if multiple_groups:
                 export_record_name = f"{body.name} - {g_comp_name}"
-                filename = f"exports/exportacao_{timestamp}_{idx}.pdf"
+                file_basename = f"exportacao_{timestamp}_{idx}.pdf"
             else:
                 if g_comp_name and g_comp_name.lower() not in body.name.lower():
                     export_record_name = f"{body.name} - {g_comp_name}"
                 else:
                     export_record_name = body.name
-                filename = f"exports/exportacao_{timestamp}.pdf"
+                file_basename = f"exportacao_{timestamp}.pdf"
+
+            rel_filename = f"exports/{file_basename}"
+            abs_filepath = os.path.join(EXPORT_DIR, file_basename)
 
             generate_export_pdf(
                 g_expenses,
                 body.name,
-                filename,
+                abs_filepath,
                 generator_name=current_user.name,
                 company_name=g_comp_name,
                 view_mode=sort_key
             )
+
+            if storage.enabled():
+                storage.upload_file(rel_filename, abs_filepath)
 
             export = models.Export(
                 name=export_record_name,
@@ -286,7 +304,7 @@ def create_export(
                 target_user_id=target_uid,
                 expense_user_ids=json.dumps(exp_user_ids) if exp_user_ids else None,
                 export_type="Padrão",
-                file_path=filename,
+                file_path=rel_filename,
             )
             db.add(export)
             db.commit()
@@ -313,8 +331,6 @@ def download_export(
     export = db.query(models.Export).filter(models.Export.id == export_id).first()
     if not export:
         raise HTTPException(404, "Exportação não encontrada")
-    if not export.file_path or not os.path.exists(export.file_path):
-        raise HTTPException(404, "Arquivo não encontrado")
 
     # Verificar permissão para usuário comum
     if current_user.role not in [models.UserRole.admin, models.UserRole.financeiro, models.UserRole.aprovador]:
@@ -330,10 +346,77 @@ def download_export(
         if not (is_creator or is_target or is_in_list):
             raise HTTPException(403, "Acesso negado para este relatório")
 
-    return FileResponse(
+    # Localizar ou obter o arquivo PDF
+    file_basename = os.path.basename(export.file_path or f"exportacao_{export.id}.pdf")
+    candidates = [
         export.file_path,
+        os.path.join(EXPORT_DIR, file_basename),
+        os.path.join("/tmp/exports", file_basename),
+        os.path.join("exports", file_basename),
+    ]
+    if export.file_path:
+        candidates.append(os.path.join("/tmp", export.file_path.lstrip("/")))
+
+    found_path = None
+    for cand in candidates:
+        if cand and os.path.isfile(cand):
+            found_path = cand
+            break
+
+    # 2. Se não achou no disco local, tentar baixar do Supabase Storage
+    if not found_path and storage.enabled():
+        data = storage.download_bytes(f"exports/{file_basename}")
+        if not data and export.file_path:
+            data = storage.download_bytes(export.file_path.lstrip("/"))
+        if data:
+            os.makedirs(EXPORT_DIR, exist_ok=True)
+            save_path = os.path.join(EXPORT_DIR, file_basename)
+            try:
+                with open(save_path, "wb") as f:
+                    f.write(data)
+                found_path = save_path
+            except Exception:
+                safe_name = f"{export.name}.pdf"
+                return Response(
+                    content=data,
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{safe_name}"'}
+                )
+
+    # 3. Se ainda não encontrou (ex: efêmero no Vercel), regenerar o PDF a partir das despesas no banco
+    if not found_path:
+        expenses = db.query(models.Expense).filter(models.Expense.export_id == export.id).order_by(models.Expense.expense_date.asc(), models.Expense.id.asc()).all()
+        if not expenses and getattr(export, 'target_user_id', None):
+            expenses = db.query(models.Expense).filter(
+                models.Expense.user_id == export.target_user_id,
+                models.Expense.status == models.ExpenseStatus.finalizado
+            ).order_by(models.Expense.expense_date.asc(), models.Expense.id.asc()).all()
+
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        gen_path = os.path.join(EXPORT_DIR, file_basename)
+        try:
+            generate_export_pdf(
+                expenses=expenses,
+                export_name=export.name,
+                output_path=gen_path,
+                generator_name=export.creator.name if export.creator else "Sistema Moura Leite",
+                view_mode="category"
+            )
+            found_path = gen_path
+            if storage.enabled():
+                storage.upload_file(f"exports/{file_basename}", gen_path)
+        except Exception as e:
+            print(f"[exports] erro ao regenerar relatório {export.id}: {e}")
+
+    if not found_path or not os.path.isfile(found_path):
+        raise HTTPException(404, "Arquivo não encontrado")
+
+    safe_name = f"{export.name}.pdf"
+    return FileResponse(
+        found_path,
         media_type="application/pdf",
-        filename=f"{export.name}.pdf"
+        filename=safe_name,
+        headers={"Content-Disposition": f'inline; filename="{safe_name}"'}
     )
 
 
