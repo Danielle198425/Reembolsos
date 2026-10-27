@@ -73,6 +73,27 @@ def _list_prefix(prefix: str):
     return files
 
 
+def ensure_bucket():
+    """Cria o bucket privado se ainda não existir."""
+    if not enabled():
+        return
+    body = json.dumps({"id": BUCKET, "name": BUCKET, "public": False}).encode()
+    req = urllib.request.Request(
+        f"{SUPABASE_URL}/storage/v1/bucket",
+        data=body,
+        headers=_headers({"Content-Type": "application/json"}),
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=30).close()
+        print(f"[storage] bucket '{BUCKET}' criado")
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode(errors="ignore")
+        if e.code in (400, 409) and "exists" in detail.lower():
+            return
+        print(f"[storage] não foi possível criar o bucket: {e.code} {detail}")
+
+
 def download_all():
     """Baixa todo o conteúdo do bucket para o disco local (na inicialização)."""
     if not enabled():

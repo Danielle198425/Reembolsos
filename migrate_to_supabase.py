@@ -60,6 +60,7 @@ print("Dados migrados.")
 
 if storage.enabled():
     print("Enviando arquivos para o Supabase Storage...")
+    storage.ensure_bucket()
     storage.sync_up()
     print("Arquivos enviados.")
 else:

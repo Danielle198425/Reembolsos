@@ -83,6 +83,7 @@ def run_auto_migrations():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Baixa arquivos do Supabase Storage (se configurado) antes de tudo
+    storage.ensure_bucket()
     storage.download_all()
     # Cria tabelas e popula dados iniciais
     Base.metadata.create_all(bind=engine)
