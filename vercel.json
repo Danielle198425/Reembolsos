@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.py"
+      "destination": "/api/index.py?__path=$1"
     },
     {
       "source": "/uploads/(.*)",
-      "destination": "/api/index.py"
+      "destination": "/api/index.py?__path=uploads/$1"
     },
     {
       "source": "/exports/(.*)",
-      "destination": "/api/index.py"
+      "destination": "/api/index.py?__path=exports/$1"
     },
     {
       "source": "/((?!api/|uploads/|exports/|static/).*)",

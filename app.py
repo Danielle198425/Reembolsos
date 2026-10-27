@@ -130,6 +130,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 app.add_middleware(
@@ -180,3 +181,38 @@ async def serve_spa(request: Request, full_path: str = ""):
     if os.path.exists(index_path):
         return FileResponse(index_path, headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"})
     return JSONResponse({"detail": "Frontend não encontrado"}, status_code=404)
+
+
+import urllib.parse  # noqa: E402
+
+
+class AsgiPathRewrite:
+    """
+    Restaura o caminho de endpoints do FastAPI reescritos pela Vercel através de __path.
+    Funciona antes do roteamento do Starlette/FastAPI ser executado.
+    """
+    def __init__(self, asgi_app):
+        self.asgi_app = asgi_app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") in ("http", "websocket"):
+            qs_bytes = scope.get("query_string", b"")
+            qs = qs_bytes.decode("utf-8", errors="ignore")
+            if "__path=" in qs:
+                params = urllib.parse.parse_qs(qs)
+                if "__path" in params:
+                    raw_val = params.pop("__path")[0].lstrip("/")
+                    if raw_val.startswith("uploads/") or raw_val.startswith("exports/"):
+                        new_p = "/" + raw_val
+                    elif raw_val.startswith("api/"):
+                        new_p = "/" + raw_val
+                    else:
+                        new_p = "/api/" + raw_val
+                    scope["path"] = new_p
+                    scope["raw_path"] = new_p.encode("ascii")
+                    clean_qs = urllib.parse.urlencode([(k, v) for k, vs in params.items() for v in vs])
+                    scope["query_string"] = clean_qs.encode("ascii")
+        await self.asgi_app(scope, receive, send)
+
+
+app = AsgiPathRewrite(app)

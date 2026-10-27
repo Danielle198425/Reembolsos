@@ -1,4 +1,10 @@
 import os
+import bcrypt
+
+# Fix para incompatibilidade passlib com bcrypt >= 4.1.0 no Python 3.12
+if not hasattr(bcrypt, "__about__"):
+    bcrypt.__about__ = type("about", (), {"__version__": getattr(bcrypt, "__version__", "4.0.1")})
+
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
