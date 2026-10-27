@@ -3,7 +3,7 @@ import mimetypes
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 from database import engine, Base, SessionLocal, IS_SQLITE
@@ -211,9 +211,17 @@ async def serve_upload(file_path: str):
 
 
 @app.get("/exports/{file_path:path}", include_in_schema=False)
-async def serve_export(file_path: str):
+async def serve_export(file_path: str, request: Request):
     clean_name = urllib.parse.unquote(file_path).lstrip("/")
     raw_name = file_path.lstrip("/")
+
+    # Se for uma chamada no formato exports/{id}/download ou exports/{id}
+    parts = clean_name.split("/")
+    if len(parts) >= 1 and parts[0].isdigit():
+        export_id = int(parts[0])
+        qs = request.url.query
+        redirect_url = f"/api/exports/{export_id}/download" + (f"?{qs}" if qs else "")
+        return RedirectResponse(redirect_url)
 
     # 1. Checa em /tmp/exports
     for candidate in (raw_name, clean_name):
@@ -281,10 +289,16 @@ class AsgiPathRewrite:
                 params = urllib.parse.parse_qs(qs)
                 if "__path" in params:
                     raw_val = params.pop("__path")[0].lstrip("/")
-                    if raw_val.startswith("uploads/") or raw_val.startswith("exports/"):
+                    if raw_val.startswith("api/"):
                         new_p = "/" + raw_val
-                    elif raw_val.startswith("api/"):
+                    elif raw_val.startswith("uploads/"):
                         new_p = "/" + raw_val
+                    elif raw_val.startswith("exports/"):
+                        parts = raw_val.split("/")
+                        if len(parts) >= 2 and (parts[1].isdigit() or parts[1] in ("bulk-send-emails",)):
+                            new_p = "/api/" + raw_val
+                        else:
+                            new_p = "/" + raw_val
                     else:
                         new_p = "/api/" + raw_val
                     scope["path"] = new_p

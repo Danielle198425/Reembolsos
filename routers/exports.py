@@ -1,5 +1,7 @@
 import os
 import json
+import urllib.parse
+import unicodedata
 from typing import Optional
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,6 +17,18 @@ router = APIRouter(prefix="/api/exports", tags=["exports"])
 
 IS_VERCEL = bool(os.environ.get("VERCEL"))
 EXPORT_DIR = "/tmp/exports" if (IS_VERCEL or not os.path.exists("exports")) else "exports"
+
+
+def _make_disposition_header(raw_filename: str, inline: bool = True) -> tuple[str, str]:
+    if not str(raw_filename).lower().endswith(".pdf"):
+        raw_filename = f"{raw_filename}.pdf"
+    nfkd = unicodedata.normalize('NFKD', str(raw_filename))
+    ascii_name = "".join([c for c in nfkd if not unicodedata.combining(c)])
+    ascii_clean = "".join(c for c in ascii_name if c.isalnum() or c in (" ", "-", "_", ".")).strip() or "relatorio.pdf"
+    encoded_name = urllib.parse.quote(str(raw_filename))
+    disp_type = "inline" if inline else "attachment"
+    header_val = f'{disp_type}; filename="{ascii_clean}"; filename*=UTF-8\'\'{encoded_name}'
+    return ascii_clean, header_val
 
 
 @router.get("")
@@ -376,11 +390,11 @@ def download_export(
                     f.write(data)
                 found_path = save_path
             except Exception:
-                safe_name = f"{export.name}.pdf"
+                ascii_filename, disp_header = _make_disposition_header(export.name, inline=True)
                 return Response(
                     content=data,
                     media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{safe_name}"'}
+                    headers={"Content-Disposition": disp_header}
                 )
 
     # 3. Se ainda não encontrou (ex: efêmero no Vercel), regenerar o PDF a partir das despesas no banco
@@ -411,12 +425,12 @@ def download_export(
     if not found_path or not os.path.isfile(found_path):
         raise HTTPException(404, "Arquivo não encontrado")
 
-    safe_name = f"{export.name}.pdf"
+    ascii_filename, disp_header = _make_disposition_header(export.name, inline=True)
     return FileResponse(
         found_path,
         media_type="application/pdf",
-        filename=safe_name,
-        headers={"Content-Disposition": f'inline; filename="{safe_name}"'}
+        filename=ascii_filename,
+        headers={"Content-Disposition": disp_header}
     )
 
 
