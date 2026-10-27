@@ -80,9 +80,27 @@ def run_auto_migrations():
             print(f"[migration] {table}.{column}: {e}")
 
 
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Baixa arquivos do Supabase Storage (se configurado) antes de tudo
+    # No Vercel (serverless lambda), o filesystem é somente leitura exceto /tmp.
+    # Supabase (Postgres + Storage) é a fonte de verdade persistente.
+    if IS_VERCEL:
+        try:
+            os.makedirs("/tmp/uploads", exist_ok=True)
+            os.makedirs("/tmp/exports", exist_ok=True)
+        except Exception:
+            pass
+        try:
+            storage.ensure_bucket()
+        except Exception:
+            pass
+        yield
+        return
+
+    # Em ambiente com disco (Local / Render):
     storage.ensure_bucket()
     storage.download_all()
     # Cria tabelas e popula dados iniciais
@@ -141,9 +159,14 @@ app.include_router(admin.router)
 app.include_router(sienge.router)
 
 # Static files
-os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+upload_dir = "/tmp/uploads" if (IS_VERCEL or not os.path.exists("uploads")) else "uploads"
+try:
+    os.makedirs(upload_dir, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
+except Exception:
+    pass
 
 
 @app.get("/", include_in_schema=False)
@@ -153,7 +176,7 @@ async def serve_spa(request: Request, full_path: str = ""):
     norm_path = full_path.replace("\\", "/")
     if norm_path.startswith("api/") or norm_path.startswith("static/") or norm_path.startswith("uploads/"):
         return JSONResponse({"detail": "Not Found"}, status_code=404)
-    index_path = "static/index.html"
+    index_path = "index.html" if os.path.exists("index.html") else "static/index.html"
     if os.path.exists(index_path):
         return FileResponse(index_path, headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"})
     return JSONResponse({"detail": "Frontend não encontrado"}, status_code=404)

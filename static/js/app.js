@@ -191,11 +191,62 @@ overlayEl.addEventListener('click', (e) => {
 // ══════════════════════════════════════════════════════════════════════════════
 const pages = ['dashboard', 'expenses', 'transactions', 'exports', 'payment-calendar', 'smartaudit', 'admin'];
 
-function navigate(page) {
+function getRequestedPage() {
+  // 1. Pathname da URL (ex: /expenses, /admin, /exports, /payment-calendar, /dashboard)
+  const path = (window.location.pathname || '').replace(/^\/+/, '').trim();
+  if (path) {
+    const parts = path.split('/').filter(Boolean);
+    const candidate = parts[0].toLowerCase();
+    if (pages.includes(candidate)) {
+      if (candidate === 'admin' && parts[1]) {
+        localStorage.setItem('ml_admin_current_section', parts[1]);
+      }
+      return candidate;
+    }
+  }
+
+  // 2. Hash da URL (ex: #expenses, #admin, #payment-calendar)
+  const hash = (window.location.hash || '').replace(/^#\/?/, '').trim();
+  if (hash) {
+    const parts = hash.split('/').filter(Boolean);
+    const candidate = parts[0].toLowerCase();
+    if (pages.includes(candidate)) {
+      if (candidate === 'admin' && parts[1]) {
+        localStorage.setItem('ml_admin_current_section', parts[1]);
+      }
+      return candidate;
+    }
+  }
+
+  // 3. Página salva no localStorage antes de atualizar (F5)
+  const saved = localStorage.getItem('ml_current_page');
+  if (saved && pages.includes(saved)) {
+    return saved;
+  }
+
+  return 'dashboard';
+}
+
+function navigate(page, updateHistory = true) {
   if (!pages.includes(page)) page = 'dashboard';
   if (page === 'admin' && App.user?.role !== 'admin') page = 'dashboard';
 
   App.currentPage = page;
+  localStorage.setItem('ml_current_page', page);
+
+  const targetPath = page === 'dashboard' ? '/' : `/${page}`;
+  if (updateHistory) {
+    try {
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ page }, '', targetPath);
+      }
+    } catch (e) {}
+  }
+  try {
+    if (window.location.hash !== `#${page}`) {
+      window.history.replaceState({ page }, '', `${targetPath}#${page}`);
+    }
+  } catch (e) {}
 
   // Esconde todas as páginas
   pages.forEach(p => {
@@ -235,8 +286,6 @@ function navigate(page) {
     case 'payment-calendar': PaymentCalendarPage.render(); break;
     case 'admin':     AdminPage.render(); break;
   }
-
-  window.location.hash = page;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -287,12 +336,12 @@ function showApp(user) {
     document.getElementById('nav-payment-calendar')?.classList.add('hidden');
   }
 
-  // Navigate to hash or dashboard (redirect if non-admin on admin route)
-  let hash = window.location.hash.replace('#', '') || 'dashboard';
-  if (hash === 'admin' && user.role !== 'admin') {
-    hash = 'dashboard';
+  // Navigate to requested page (redirect if non-admin on admin route)
+  let initialPage = getRequestedPage();
+  if (initialPage === 'admin' && user.role !== 'admin') {
+    initialPage = 'dashboard';
   }
-  navigate(hash);
+  navigate(initialPage, false);
 }
 
 async function exitImpersonation() {
@@ -389,6 +438,7 @@ document.getElementById('toggle-pw-btn').addEventListener('click', () => {
 document.getElementById('logout-btn').addEventListener('click', () => {
   sessionStorage.removeItem('ml_impersonator_token');
   sessionStorage.removeItem('ml_impersonator_user');
+  localStorage.removeItem('ml_current_page');
   Api.setToken(null);
   App.user = null;
   if (window.ExpensesPage) {
@@ -396,6 +446,9 @@ document.getElementById('logout-btn').addEventListener('click', () => {
     ExpensesPage.categories = [];
     ExpensesPage.users = [];
   }
+  try {
+    window.history.replaceState({}, '', '/');
+  } catch (e) {}
   window.location.hash = '';
   showLogin();
   toast('Sessão encerrada', 'info');
@@ -483,8 +536,22 @@ if ('caches' in window) {
 // ══════════════════════════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════════════════════════
+window.addEventListener('popstate', () => {
+  if (App.user) {
+    const page = getRequestedPage();
+    if (page !== App.currentPage) {
+      navigate(page, false);
+    }
+  }
+});
+
 window.addEventListener('hashchange', () => {
-  if (App.user) navigate(window.location.hash.replace('#', '') || 'dashboard');
+  if (App.user) {
+    const page = getRequestedPage();
+    if (page !== App.currentPage) {
+      navigate(page, false);
+    }
+  }
 });
 
 applyAppLogo();

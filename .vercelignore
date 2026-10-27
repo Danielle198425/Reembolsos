@@ -1,0 +1,12 @@
+.git
+reembolsos.db
+reembolsos.db.bak
+reembolsos_backup*.db
+*.db
+backups
+backup_projeto_reembolsos.zip
+scratch
+temp.txt
+*.pyc
+__pycache__
+.env

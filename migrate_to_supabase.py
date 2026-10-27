@@ -35,17 +35,36 @@ with dst.begin() as conn:
 if existing:
     sys.exit(f"O destino já tem {existing} usuário(s). Abortando para não duplicar dados.")
 
-# colunas que existem nas duas pontas (o SQLite pode ter colunas a menos/mais)
+# O SQLite não valida chaves estrangeiras; o Postgres valida. Registros antigos
+# podem apontar para linhas que não existem mais. Esses vínculos são zerados.
+loaded_ids = {}  # tabela -> conjunto de ids já carregados
 with src.connect() as sconn, dst.begin() as dconn:
     for table in metadata.sorted_tables:
         try:
-            rows = sconn.execute(table.select()).mappings().all()
+            rows = [dict(r) for r in sconn.execute(table.select()).mappings().all()]
         except Exception as e:
             print(f"  - {table.name}: ignorada ({e.__class__.__name__})")
             continue
+        fixed = 0
+        for fk in table.foreign_keys:
+            col = fk.parent.name
+            parent_table = fk.column.table.name
+            parent_ids = loaded_ids.get(parent_table)
+            if parent_ids is None:
+                continue
+            for row in rows:
+                val = row.get(col)
+                if val is not None and val not in parent_ids:
+                    if not fk.parent.nullable:
+                        sys.exit(f"{table.name}.{col}={val} aponta para {parent_table} inexistente e não pode ser nulo.")
+                    row[col] = None
+                    fixed += 1
         if rows:
-            dconn.execute(insert(table), [dict(r) for r in rows])
-        print(f"  - {table.name}: {len(rows)} linha(s)")
+            dconn.execute(insert(table), rows)
+        if "id" in table.c:
+            loaded_ids[table.name] = {r["id"] for r in rows}
+        note = f" ({fixed} vínculo(s) quebrado(s) zerado(s))" if fixed else ""
+        print(f"  - {table.name}: {len(rows)} linha(s){note}")
 
     # ajusta as sequences de id do Postgres
     for table in metadata.sorted_tables:
