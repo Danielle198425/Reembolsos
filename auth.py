@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 
-SECRET_KEY = "mouraleite-secret-key-2024-reembolsos-sistema"
+SECRET_KEY = os.environ.get("SECRET_KEY", "mouraleite-secret-key-2024-reembolsos-sistema")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 8
 

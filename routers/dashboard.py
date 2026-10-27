@@ -1,7 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_, and_, extract
 from database import get_db
 import models, schemas, auth
 
@@ -93,7 +93,14 @@ def get_summary(
     # Filtro opcional por mês (YYYY-MM)
     if month and len(month.strip()) == 7:
         m_clean = month.strip()
-        base = base.filter(func.strftime('%Y-%m', models.Expense.expense_date) == m_clean)
+        try:
+            y_val, m_val = int(m_clean[:4]), int(m_clean[5:7])
+            base = base.filter(
+                extract('year', models.Expense.expense_date) == y_val,
+                extract('month', models.Expense.expense_date) == m_val,
+            )
+        except ValueError:
+            pass
 
     def total_by_status(status_val):
         result = base.filter(models.Expense.status == status_val).with_entities(
