@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moura Leite — Sistema de Reembolsos</title>
+  <meta name="description" content="Sistema de gestão de reembolsos corporativos da Moura Leite" />
+  <meta name="theme-color" content="#1E1B4B" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/static/icons/logo-icon.svg" />
+  <link rel="shortcut icon" href="/static/icons/logo-icon.png" />
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css?v=62" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     LOGIN SCREEN
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="login-screen" class="login-screen">
+  <div class="login-bg">
+    <div class="login-orb login-orb-1"></div>
+    <div class="login-orb login-orb-2"></div>
+    <div class="login-orb login-orb-3"></div>
+  </div>
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-mark" id="login-logo-mark"><img src="/static/icons/logo-icon.svg" style="max-height:100%; max-width:100%; object-fit:contain;" alt="Moura Leite" /></div>
+      <div class="login-brand">
+        <span class="brand-name">Moura Leite</span>
+        <span class="brand-sub">Sistema de Reembolsos</span>
+      </div>
+    </div>
+    <h1 class="login-title">Bem-vindo de volta</h1>
+    <p class="login-sub">Entre com suas credenciais para continuar</p>
+    <form id="login-form" class="login-form">
+      <div class="form-group">
+        <label for="login-email">E-mail</label>
+        <div class="input-wrapper">
+          <span class="input-icon">📧</span>
+          <input id="login-email" type="email" placeholder="seu@mouraleite.com.br" autocomplete="email" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="login-password">Senha</label>
+        <div class="input-wrapper">
+          <span class="input-icon">🔒</span>
+          <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required />
+          <button type="button" class="toggle-pw" id="toggle-pw-btn" aria-label="Mostrar senha">👁️</button>
+        </div>
+      </div>
+      <div id="login-error" class="login-error hidden"></div>
+      <button type="submit" class="btn btn-primary btn-full" id="login-btn">
+        <span id="login-btn-text">Entrar</span>
+        <span id="login-spinner" class="spinner hidden"></span>
+      </button>
+    </form>
+    <div class="login-hints">
+      <p>Contas de demonstração:</p>
+      <div class="hint-chips">
+        <button type="button" class="hint-chip" onclick="fillLogin('admin@mouraleite.com.br','Admin@123')">Admin</button>
+        <button type="button" class="hint-chip" onclick="fillLogin('joao.silva@mouraleite.com.br','User@123')">João (Usuário)</button>
+        <button type="button" class="hint-chip" onclick="fillLogin('maria.santos@mouraleite.com.br','User@123')">Maria (Aprovador)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function fillLogin(email, pwd) {
+  const emailInput = document.getElementById('login-email');
+  const pwdInput = document.getElementById('login-password');
+  const errEl = document.getElementById('login-error');
+
+  if (emailInput) {
+    emailInput.value = email;
+    emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+    emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (pwdInput) {
+    pwdInput.value = pwd;
+    pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
+    pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (errEl) errEl.classList.add('hidden');
+}
+window.fillLogin = fillLogin;
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     APP SHELL
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="app-shell" class="app-shell hidden">
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="logo-mark-sm" id="sidebar-logo-mark"><img src="/static/icons/logo-icon.svg" style="max-height:100%; max-width:100%; object-fit:contain;" alt="Moura Leite" /></div>
+        <span class="sidebar-brand">Moura Leite</span>
+      </div>
+      <button id="collapse-btn" class="collapse-btn" aria-label="Recolher menu" title="Recolher menu">‹</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#dashboard" class="nav-item active" id="nav-dashboard" data-page="dashboard">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Painel de Controle</span>
+      </a>
+      <a href="#expenses" class="nav-item" id="nav-expenses" data-page="expenses">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Despesas</span>
+        <span class="nav-badge hidden" id="nav-expenses-badge">0</span>
+      </a>
+      <a href="#exports" class="nav-item" id="nav-exports" data-page="exports">
+        <span class="nav-icon">📤</span>
+        <span class="nav-label">Exportações</span>
+      </a>
+      <a href="#payment-calendar" class="nav-item admin-or-finance-only hidden" id="nav-payment-calendar" data-page="payment-calendar">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">Calendários</span>
+      </a>
+      <a href="#admin" class="nav-item admin-only hidden" id="nav-admin" data-page="admin">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Administração</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-avatar">?</div>
+        <div class="user-details">
+          <span class="user-name" id="sidebar-user-name">Carregando...</span>
+          <span class="user-role" id="sidebar-user-role"></span>
+        </div>
+      </div>
+      <button class="logout-btn" id="logout-btn" title="Sair">↩</button>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main id="main-content" class="main-content">
+    <div id="impersonation-bar" class="impersonation-bar hidden">
+      <div class="impersonation-bar-inner">
+        <div class="impersonation-bar-info">
+          <span class="impersonation-badge">MODO SIMULAÇÃO</span>
+          <span id="impersonation-bar-text">Você está visualizando o sistema como <strong>...</strong></span>
+        </div>
+        <button id="impersonation-exit-btn" class="btn btn-sm btn-white" style="color:#4f46e5;font-weight:700;white-space:nowrap;">
+          ✕ Sair do modo Ver como
+        </button>
+      </div>
+    </div>
+    <div id="page-dashboard" class="page"></div>
+    <div id="page-expenses" class="page hidden"></div>
+    <div id="page-exports" class="page hidden"></div>
+    <div id="page-payment-calendar" class="page hidden"></div>
+    <div id="page-admin" class="page hidden"></div>
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     GLOBAL MODAL
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true">
+  <div class="modal" id="modal-box">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">Modal</h2>
+      <button class="modal-close" id="modal-close-btn" aria-label="Fechar">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TOAST NOTIFICATIONS
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     PWA INSTALL BANNER
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="pwa-banner" class="pwa-banner hidden">
+  <span>📱 Instale o app para acesso offline</span>
+  <button id="pwa-install-btn" class="btn btn-sm btn-white">Instalar</button>
+  <button id="pwa-dismiss-btn" class="btn btn-sm btn-ghost">✕</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/js/api.js?v=68"></script>
+<script src="/static/js/dashboard.js?v=62"></script>
+<script src="/static/js/expenses.js?v=67"></script>
+<script src="/static/js/exports.js?v=64"></script>
+<script src="/static/js/payment_calendar.js?v=62"></script>
+<script src="/static/js/admin.js?v=77"></script>
+<script src="/static/js/app.js?v=63"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+*.db
+*.db.bak
+*.bak
+backups/
+backup_projeto_reembolsos.zip
+*.zip
+uploads/
+exports/
+scratch/
+temp.txt

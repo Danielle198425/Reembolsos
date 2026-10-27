@@ -1,0 +1,32 @@
+import re
+
+log_path = r'C:\Users\Usuario\.gemini\antigravity-ide\brain\ddf6e702-41a1-4485-8b63-e752e1b02880\.system_generated\logs\transcript_full.jsonl'
+
+with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+    text = f.read()
+
+idx = text.find('iVBORw0KGgoAAAANSUhEUgAAAYUAAAB+CAYAAA')
+if idx != -1:
+    # Find start of string (e.g. after ' or ")
+    # Search backwards for quote or comma
+    sub = text[idx:idx+20000]
+    # The base64 string ends before ', 2026 or ", " or ')]
+    end_match = re.search(r"('|\"),\s*'2026-07-22", sub)
+    if end_match:
+        end_pos = end_match.start()
+        raw_b64 = sub[:end_pos]
+        if not raw_b64.startswith('data:image'):
+            raw_b64 = 'data:image/png;base64,' + raw_b64
+        print("EXACT FULL ORIGINAL B64 LENGTH:", len(raw_b64))
+        with open('scratch/original_logo_b64.txt', 'w', encoding='utf-8') as out:
+            out.write(raw_b64)
+        
+        import sqlite3
+        conn = sqlite3.connect('reembolsos.db')
+        c = conn.cursor()
+        c.execute('UPDATE company_logo SET data = ?, updated_at = datetime("now")', (raw_b64,))
+        conn.commit()
+        conn.close()
+        print("Successfully updated database company_logo with EXACT ORIGINAL B64!")
+    else:
+        print("Could not find end match, printing snippet:", sub[:300])

@@ -1,0 +1,39 @@
+{
+  "name": "Moura Leite Reembolsos",
+  "short_name": "ML Reembolsos",
+  "description": "Sistema de gestão de reembolsos corporativos da Moura Leite",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1E1B4B",
+  "theme_color": "#1E1B4B",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Nova Despesa",
+      "url": "/#expenses",
+      "description": "Criar nova despesa de reembolso"
+    },
+    {
+      "name": "Painel",
+      "url": "/#dashboard",
+      "description": "Ver painel de controle"
+    }
+  ]
+}

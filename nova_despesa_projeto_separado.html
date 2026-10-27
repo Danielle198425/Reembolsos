@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Nova Despesa - Projeto Separado</title>
+  <style>
+    /* Estilos globais e de layout para funcionamento independente */
+    :root {
+      --bg: #F3F4F6;
+      --card-bg: #FFFFFF;
+      --text: #1F2937;
+      --border: #E5E7EB;
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+    }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      background: var(--bg); 
+      color: var(--text); 
+      padding: 40px; 
+      display: flex;
+      justify-content: center;
+    }
+    .modal { 
+      background: var(--card-bg); 
+      border-radius: 8px; 
+      padding: 24px; 
+      width: 100%;
+      max-width: 600px; 
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+    }
+    .form-grid { 
+      display: grid; 
+      grid-template-columns: 1fr 1fr; 
+      gap: 16px; 
+      margin-bottom: 20px; 
+    }
+    .field { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 6px; 
+    }
+    .span-2 { grid-column: span 2; }
+    label { font-size: 14px; font-weight: 600; }
+    input, select, textarea { 
+      padding: 10px 12px; 
+      border: 1px solid var(--border); 
+      border-radius: 6px; 
+      font-size: 14px; 
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .btn-group { 
+      display: flex; 
+      justify-content: flex-end; 
+      gap: 12px; 
+      margin-top: 24px; 
+      grid-column: span 2;
+    }
+    button { 
+      padding: 10px 16px; 
+      border: none; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      font-weight: 600; 
+      font-size: 14px;
+    }
+    #save-draft-btn { background: #E5E7EB; color: var(--text); }
+    #save-submit-btn { background: var(--primary); color: white; }
+    #save-submit-btn:hover { background: var(--primary-hover); }
+    .req { color: #EF4444; }
+  </style>
+</head>
+<body>
+
+<div class="modal">
+  <h2 style="margin-top:0; border-bottom: 1px solid var(--border); padding-bottom: 12px;">Nova Despesa</h2>
+  
+  <div class="form-grid">
+    <!-- 1. Anexo do Comprovante (Primeiro campo) -->
+    <div class="field span-2 required" id="ef-receipt-wrap">
+      <label for="ef-receipt">Anexo do Comprovante (PDF/JPG/PNG) <span class="req">*</span></label>
+      <input type="file" id="ef-receipt" accept=".pdf,.png,.jpg,.jpeg" />
+      
+      <!-- Mensagem de Loading do OCR -->
+      <div id="ocr-loading" style="display:none; font-size:13px; color: var(--primary); margin-top:6px; font-weight: 500;">
+        ⏳ Lendo comprovante com IA...
+      </div>
+    </div>
+    
+    <!-- 2. Fornecedor -->
+    <div class="field span-2 required" id="ef-provider-wrap">
+      <label for="ef-provider">Fornecedor <span class="req">*</span></label>
+      <input type="text" id="ef-provider" placeholder="Nome do local / fornecedor" />
+    </div>
+
+    <!-- 3. Categoria Corrigida (Refeição) -->
+    <div class="field required">
+      <label for="ef-category">Categoria <span class="req">*</span></label>
+      <select id="ef-category">
+        <option value="">Selecione...</option>
+        <option value="1" data-limit="150" data-name="Refeição">🍽️ Refeição</option>
+        <option value="2" data-limit="" data-name="Combustível">⛽ Combustível</option>
+        <option value="3" data-limit="" data-name="Hotel">🏨 Hotel</option>
+      </select>
+    </div>
+    
+    <div class="field required">
+      <label for="ef-cc">Centro de Custo <span class="req">*</span></label>
+      <select id="ef-cc">
+        <option value="1">CC001 | Administrativo</option>
+        <option value="2">CC002 | Vendas</option>
+      </select>
+    </div>
+    
+    <div class="field required">
+      <label for="ef-date">Data da Despesa <span class="req">*</span></label>
+      <input type="date" id="ef-date" />
+    </div>
+
+    <!-- 4. Valor com máscara R$ -->
+    <div class="field required" id="ef-amount-wrap">
+      <label for="ef-amount">Valor (R$) <span class="req">*</span></label>
+      <input type="text" id="ef-amount" placeholder="R$ 0,00" />
+    </div>
+    
+    <div class="field span-2 required" id="ef-desc-wrap">
+      <label for="ef-description">Descrição <span class="req">*</span></label>
+      <input type="text" id="ef-description" placeholder="Ex: Almoço com cliente" />
+    </div>
+
+    <!-- 6. Botões -->
+    <div class="btn-group">
+      <button type="button" id="save-draft-btn">💾 Salvar Rascunho</button>
+      <button type="button" id="save-submit-btn">📤 Salvar e Submeter</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 1. OCR no Anexo do Comprovante
+// ==========================================
+document.getElementById('ef-receipt').addEventListener('change', async (e) => {
+  if (!e.target.files.length) return;
+  const file = e.target.files[0];
+  const loader = document.getElementById('ocr-loading');
+  loader.style.display = 'block'; // Mostra que a IA está lendo
+
+  // Simulação de processamento OCR
+  setTimeout(() => {
+    // Dados fictícios simulando retorno da inteligência artificial
+    const ocrData = {
+      provider: "Restaurante Central",
+      amount: 155.00,
+      date: new Date().toISOString().slice(0, 10),
+      category_suggestion: "Refeição"
+    };
+
+    // Preenche os campos magicamente
+    document.getElementById('ef-provider').value = ocrData.provider;
+    document.getElementById('ef-date').value = ocrData.date;
+    
+    // Formata o Valor retornado para a máscara
+    const strVal = ocrData.amount.toFixed(2).replace('.', ',');
+    document.getElementById('ef-amount').value = 'R$ ' + strVal;
+
+    // Seleciona Categoria sugerida
+    const sel = document.getElementById('ef-category');
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].text.toLowerCase().includes(ocrData.category_suggestion.toLowerCase())) {
+        sel.selectedIndex = i;
+        break;
+      }
+    }
+    
+    loader.style.display = 'none';
+  }, 1500); 
+});
+
+// ==========================================
+// 4. Máscara de Valor (R$)
+// ==========================================
+const amtInput = document.getElementById('ef-amount');
+amtInput.addEventListener('input', (e) => {
+  let val = e.target.value.replace(/\D/g, '');
+  if (val === '') { e.target.value = ''; return; }
+  
+  val = (parseInt(val, 10) / 100).toFixed(2);
+  e.target.value = 'R$ ' + val.replace('.', ',');
+});
+
+// ==========================================
+// 5. e 6. Salvar e Alerta de Limite Diário
+// ==========================================
+function salvarDespesa(submeter) {
+  const amountStr = document.getElementById('ef-amount').value || '';
+  const amount = parseFloat(amountStr.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+  
+  const provider = document.getElementById('ef-provider').value.trim();
+  const date = document.getElementById('ef-date').value;
+  const desc = document.getElementById('ef-description').value.trim();
+  
+  const sel = document.getElementById('ef-category');
+  const opt = sel.options[sel.selectedIndex];
+  const limit = parseFloat(opt?.dataset.limit);
+  const catName = opt?.dataset.name || '';
+
+  // Validação básica
+  if (!provider || isNaN(amount) || !desc) {
+    alert("Por favor, preencha os campos obrigatórios (Fornecedor, Valor e Descrição).");
+    return;
+  }
+
+  // TRAVA / ALERTA DE LIMITE
+  if (limit && amount > limit) {
+    alert(`❌ Bloqueado: O valor de R$ ${amount.toFixed(2).replace('.', ',')} excede o limite máximo permitido de R$ ${limit.toFixed(2).replace('.', ',')} para a categoria "${catName}". Por favor, corrija o valor para continuar.`);
+    document.getElementById('ef-amount')?.focus();
+    return; // Interrompe o processo e não permite salvar
+  }
+
+  // Prepara o objeto
+  const bodyPayload = {
+    provider: provider,
+    amount: amount,
+    date: date,
+    category_id: sel.value,
+    description: desc,
+    status: submeter ? 'submetido' : 'rascunho'
+  };
+
+  console.log("Enviando...", bodyPayload);
+  alert(submeter ? "✅ Despesa Salva e Submetida com sucesso!" : "💾 Rascunho da Despesa Salvo!");
+}
+
+// Vincula as ações aos botões correspondentes
+document.getElementById('save-draft-btn').addEventListener('click', () => salvarDespesa(false));
+document.getElementById('save-submit-btn').addEventListener('click', () => salvarDespesa(true));
+</script>
+
+</body>
+</html>
