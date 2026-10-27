@@ -11,6 +11,10 @@ const AdminPage = {
       return;
     }
 
+    try {
+      localStorage.removeItem('ml_admin_status_filters');
+    } catch (e) {}
+
     this.currentSection = localStorage.getItem('ml_admin_current_section') || 'users';
 
     document.getElementById('page-admin').innerHTML = `
@@ -497,13 +501,7 @@ const AdminPage = {
     const searchInput = document.getElementById('search-sienge-cc');
     const term = (searchInput ? searchInput.value : '').trim().toLowerCase();
     const select = document.getElementById('filter-sienge-cc-tbody');
-    const status = select ? select.value : 'all';
-
-    if (!this._statusFilters) this._statusFilters = {};
-    this._statusFilters['sienge-cc-tbody'] = status;
-    try {
-      localStorage.setItem('ml_admin_status_filters', JSON.stringify(this._statusFilters));
-    } catch (e) {}
+    const status = select ? select.value : 'active';
 
     const rows = document.querySelectorAll('#sienge-cc-tbody tr[data-status]');
     rows.forEach(row => {
@@ -525,17 +523,10 @@ const AdminPage = {
       this.filterSiengeCCTable();
       return;
     }
-    if (!this._statusFilters) {
-      try {
-        this._statusFilters = JSON.parse(localStorage.getItem('ml_admin_status_filters')) || {};
-      } catch (e) {
-        this._statusFilters = {};
-      }
+    const select = document.getElementById(`filter-${tbodyId}`);
+    if (select && select.value !== status) {
+      select.value = status;
     }
-    this._statusFilters[tbodyId] = status;
-    try {
-      localStorage.setItem('ml_admin_status_filters', JSON.stringify(this._statusFilters));
-    } catch (e) {}
     const rows = document.querySelectorAll(`#${tbodyId} tr[data-status]`);
     rows.forEach(row => {
       if (status === 'all') {
@@ -547,33 +538,17 @@ const AdminPage = {
       }
     });
   },
+
   applyCurrentFilter(tbodyId) {
     if (tbodyId === 'sienge-cc-tbody') {
-      const defaultStatus = 'all';
-      if (!this._statusFilters) {
-        try {
-          this._statusFilters = JSON.parse(localStorage.getItem('ml_admin_status_filters')) || {};
-        } catch (e) {
-          this._statusFilters = {};
-        }
-      }
-      const status = this._statusFilters[tbodyId] || defaultStatus;
-      const select = document.getElementById(`filter-${tbodyId}`);
+      const select = document.getElementById('filter-sienge-cc-tbody');
+      const status = (select && select.value) ? select.value : 'active';
       if (select) select.value = status;
       this.filterSiengeCCTable();
       return;
     }
-    if (!this._statusFilters) {
-      try {
-        this._statusFilters = JSON.parse(localStorage.getItem('ml_admin_status_filters')) || {};
-      } catch (e) {
-        this._statusFilters = {};
-      }
-    }
-    const defaultActiveTables = ['sienge-companies-tbody', 'sienge-app-tbody'];
-    const defaultStatus = defaultActiveTables.includes(tbodyId) ? 'active' : 'all';
-    const status = this._statusFilters[tbodyId] || defaultStatus;
     const select = document.getElementById(`filter-${tbodyId}`);
+    const status = (select && select.value) ? select.value : 'active';
     if (select) select.value = status;
     this.filterTable(status, tbodyId);
   },
@@ -585,9 +560,9 @@ const AdminPage = {
         <div class="table-header">
           <span class="card-title">👤 Usuários</span>
           <div style="display:flex; gap:10px; align-items:center;">
-            <select id="filter-users-tbody" class="form-control" style="width:auto; padding:4px 8px; font-size:13px;" onchange="AdminPage.filterTable(this.value, \'users-tbody\')">
+            <select id="filter-users-tbody" class="form-control" style="width:auto; padding:4px 8px; font-size:13px;" onchange="AdminPage.filterTable(this.value, 'users-tbody')">
+              <option value="active" selected>Somente Ativos</option>
               <option value="all">Todos</option>
-              <option value="active">Somente Ativos</option>
               <option value="inactive">Somente Inativos</option>
             </select>
             <button class="btn btn-primary btn-sm" id="btn-add-user">＋ Novo Usuário</button>
@@ -1450,8 +1425,8 @@ const AdminPage = {
           <span class="card-title">🏷️ Categorias</span>
           <div style="display:flex; gap:10px; align-items:center;">
             <select id="filter-cats-tbody" class="form-control" style="width:auto; padding:4px 8px; font-size:13px;" onchange="AdminPage.filterTable(this.value, 'cats-tbody')">
+              <option value="active" selected>Somente Ativos</option>
               <option value="all">Todos</option>
-              <option value="active">Somente Ativos</option>
               <option value="inactive">Somente Inativos</option>
             </select>
             <button class="btn btn-primary btn-sm" id="btn-add-cat">＋ Nova Categoria</button>
@@ -1702,8 +1677,8 @@ const AdminPage = {
           <span class="card-title">🏢 Departamento Sienge</span>
           <div style="display:flex; gap:10px; align-items:center;">
             <select id="filter-cc-tbody" class="form-control" style="width:auto; padding:4px 8px; font-size:13px;" onchange="AdminPage.filterTable(this.value, 'cc-tbody')">
+              <option value="active" selected>Somente Ativos</option>
               <option value="all">Todos</option>
-              <option value="active">Somente Ativos</option>
               <option value="inactive">Somente Inativos</option>
             </select>
             <button class="btn btn-primary" onclick="AdminPage.syncSiengeDepartments()">🔄 Sincronizar Sienge</button>
@@ -1797,8 +1772,8 @@ const AdminPage = {
             <span class="card-title">👨‍💼 Perfil</span>
             <div style="display:flex; gap:10px; align-items:center;">
               <select id="filter-role-tbody" class="form-control" style="width:auto; padding:4px 8px; font-size:13px;" onchange="AdminPage.filterTable(this.value, 'role-tbody')">
+                <option value="active" selected>Somente Ativos</option>
                 <option value="all">Todos</option>
-                <option value="active">Somente Ativos</option>
                 <option value="inactive">Somente Inativos</option>
               </select>
               <button class="btn btn-primary btn-sm" id="btn-add-role">➕ Novo Perfil</button>
@@ -1920,8 +1895,8 @@ const AdminPage = {
             <span class="card-title">💼 Função</span>
             <div style="display:flex; gap:10px; align-items:center;">
               <select id="filter-func-tbody" class="form-control" style="width:auto; padding:4px 8px; font-size:13px;" onchange="AdminPage.filterTable(this.value, 'func-tbody')">
+                <option value="active" selected>Somente Ativos</option>
                 <option value="all">Todos</option>
-                <option value="active">Somente Ativos</option>
                 <option value="inactive">Somente Inativos</option>
               </select>
               <button class="btn btn-primary btn-sm" id="btn-add-func">➕ Nova Função</button>
@@ -2058,8 +2033,8 @@ const AdminPage = {
           <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <input type="text" id="search-sienge-cc" placeholder="🔍 Buscar por código ou nome..." oninput="AdminPage.filterSiengeCCTable()" style="padding:6px 12px; font-size:13px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-1); min-width:240px; outline:none;" />
             <select id="filter-sienge-cc-tbody" class="form-control" style="width:auto; padding:4px 8px; font-size:13px;" onchange="AdminPage.filterTable(this.value, 'sienge-cc-tbody')">
+              <option value="active" selected>Somente Ativos</option>
               <option value="all">Todos</option>
-              <option value="active">Somente Ativos</option>
               <option value="inactive">Somente Inativos</option>
             </select>
             <button class="btn btn-primary" onclick="AdminPage.syncSiengeCostCenters()">🔄 Sincronizar Sienge</button>
@@ -2144,10 +2119,6 @@ const AdminPage = {
         }).join('');
       }
 
-      if (!this._statusFilters) this._statusFilters = {};
-      if (!this._statusFilters['sienge-cc-tbody']) {
-        this._statusFilters['sienge-cc-tbody'] = 'all';
-      }
       this.applyCurrentFilter('sienge-cc-tbody');
     } catch (err) {
       document.getElementById('sienge-cc-tbody').innerHTML = `<tr><td colspan="4" style="color:var(--red);">Erro: ${escHtml(err.message)}</td></tr>`;
@@ -2261,8 +2232,6 @@ const AdminPage = {
             </td>
           </tr>`).join('');
       }
-      if (!this._statusFilters) this._statusFilters = {};
-      this._statusFilters['sienge-companies-tbody'] = 'active';
       this.applyCurrentFilter('sienge-companies-tbody');
     } catch (err) {
       document.getElementById('sienge-companies-tbody').innerHTML = `<tr><td colspan="3" style="color:var(--red);">Erro: ${escHtml(err.message)}</td></tr>`;
@@ -2357,8 +2326,6 @@ const AdminPage = {
             </td>
           </tr>`).join('');
       }
-      if (!this._statusFilters) this._statusFilters = {};
-      this._statusFilters['sienge-app-tbody'] = 'active';
       this.applyCurrentFilter('sienge-app-tbody');
     } catch (err) {
       document.getElementById('sienge-app-tbody').innerHTML = `<tr><td colspan="3" style="color:var(--red);">Erro: ${escHtml(err.message)}</td></tr>`;
@@ -2391,7 +2358,14 @@ const AdminPage = {
       <div class="table-wrapper">
         <div class="table-header">
           <span class="card-title">🚗 Níveis de Quilometragem</span>
-          <button class="btn btn-primary" id="btn-add-mileage">➕ Novo Nível</button>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <select id="filter-mileage-tbody" class="form-control" style="width:auto; padding:4px 8px; font-size:13px;" onchange="AdminPage.filterTable(this.value, 'mileage-tbody')">
+              <option value="active" selected>Somente Ativos</option>
+              <option value="all">Todos</option>
+              <option value="inactive">Somente Inativos</option>
+            </select>
+            <button class="btn btn-primary" id="btn-add-mileage">➕ Novo Nível</button>
+          </div>
         </div>
         <table>
           <thead>
@@ -2700,8 +2674,8 @@ const AdminPage = {
           <span class="card-title">🚫 Motivos de Rejeição</span>
           <div style="display:flex; gap:10px; align-items:center;">
             <select id="filter-reasons-tbody" class="form-control" style="width:auto; padding:4px 8px; font-size:13px;" onchange="AdminPage.filterTable(this.value, 'reasons-tbody')">
+              <option value="active" selected>Somente Ativos</option>
               <option value="all">Todos</option>
-              <option value="active">Somente Ativos</option>
               <option value="inactive">Somente Inativos</option>
             </select>
             <button class="btn btn-primary btn-sm" id="btn-add-reason">+ Novo Motivo</button>
