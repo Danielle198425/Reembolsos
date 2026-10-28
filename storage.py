@@ -19,9 +19,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
-BUCKET = os.environ.get("SUPABASE_BUCKET", "reembolsos")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+BUCKET = os.environ.get("SUPABASE_BUCKET", "reembolsos").strip()
 SYNC_DIRS = ("uploads", "exports")
 
 _lock = threading.Lock()

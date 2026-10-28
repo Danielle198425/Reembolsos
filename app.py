@@ -80,6 +80,19 @@ def run_auto_migrations():
         except Exception as e:
             print(f"[migration] {table}.{column}: {e}")
 
+    # Migrações adicionais de tipo e constraints no Postgres
+    if not IS_SQLITE:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE users ALTER COLUMN payment_method TYPE VARCHAR(50);"))
+        except Exception as e:
+            print(f"[migration] users.payment_method: {e}")
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_cost_center_id_fkey;"))
+        except Exception as e:
+            print(f"[migration] drop users_cost_center_id_fkey: {e}")
+
 
 IS_VERCEL = bool(os.environ.get("VERCEL"))
 
@@ -99,6 +112,10 @@ async def lifespan(app: FastAPI):
             storage.sync_up_async()
         except Exception:
             pass
+        try:
+            run_auto_migrations()
+        except Exception as e:
+            print(f"[migration] erro no Vercel: {e}")
         yield
         return
 

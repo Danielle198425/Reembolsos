@@ -867,6 +867,7 @@ const AdminPage = {
         return;
       }
 
+      const isBankPayment = ['TED', 'Depósito Itaú'].includes(paymentMethod);
       const body = { 
         creditor_code: creditorCode,
         name, 
@@ -880,9 +881,9 @@ const AdminPage = {
         approver_rules: approverRules,
         payment_method: paymentMethod || null,
         pix_key: paymentMethod === 'PIX' ? pixKey : null,
-        bank: paymentMethod === 'TED' ? bank : null,
-        agency: paymentMethod === 'TED' ? agency : null,
-        account: paymentMethod === 'TED' ? account : null
+        bank: isBankPayment ? bank : null,
+        agency: isBankPayment ? agency : null,
+        account: isBankPayment ? account : null
       };
       if (!id) body.active = true;
 

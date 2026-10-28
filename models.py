@@ -4,7 +4,7 @@ from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime,
     Date, ForeignKey, Text, Enum as SAEnum
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, foreign
 from database import Base
 
 
@@ -36,7 +36,7 @@ class User(Base):
     email = Column(String(200), unique=True, nullable=False, index=True)
     password_hash = Column(String(256), nullable=False)
     role = Column(SAEnum(UserRole), default=UserRole.usuario, nullable=False)
-    cost_center_id = Column(Integer, ForeignKey("cost_centers.id"), nullable=True)
+    cost_center_id = Column(Integer, nullable=True)
     job_role_id = Column(Integer, ForeignKey("job_roles.id"), nullable=True)
     job_function_id = Column(Integer, ForeignKey("job_functions.id"), nullable=True)
     active = Column(Boolean, default=True)
@@ -46,14 +46,14 @@ class User(Base):
     approver_of = Column(Text, nullable=True)
     approver_of_functions = Column(Text, nullable=True)
     approver_rules = Column(Text, nullable=True)
-    payment_method = Column(String(10), nullable=True)
+    payment_method = Column(String(50), nullable=True)
     pix_key = Column(String(200), nullable=True)
     bank = Column(String(100), nullable=True)
     agency = Column(String(50), nullable=True)
     account = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    cost_center = relationship("CostCenter", foreign_keys=[cost_center_id])
+    cost_center = relationship("CostCenter", foreign_keys=[cost_center_id], primaryjoin="User.cost_center_id == foreign(CostCenter.id)", uselist=False)
     job_role = relationship("JobRole", foreign_keys=[job_role_id])
     job_function = relationship("JobFunction", foreign_keys=[job_function_id])
     expenses = relationship("Expense", back_populates="user", foreign_keys="Expense.user_id")

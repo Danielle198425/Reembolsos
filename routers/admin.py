@@ -2,7 +2,8 @@ import os
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Body, File, UploadFile
 from sqlalchemy.orm import Session
-from database import get_db
+from sqlalchemy import text
+from database import get_db, IS_SQLITE
 import models, schemas, auth
 import storage
 import json
@@ -159,6 +160,19 @@ def create_user(
     if db.query(models.User).filter(models.User.email == body.email).first():
         raise HTTPException(400, "E-mail já cadastrado")
 
+    # Garante que a coluna payment_method possui tamanho suficiente no PostgreSQL
+    if not IS_SQLITE:
+        try:
+            db.execute(text("ALTER TABLE users ALTER COLUMN payment_method TYPE VARCHAR(50);"))
+            db.commit()
+        except Exception:
+            db.rollback()
+        try:
+            db.execute(text("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_cost_center_id_fkey;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
     inferred_role = models.UserRole.usuario
     if body.job_role_id:
         job_role = db.query(models.JobRole).filter(models.JobRole.id == body.job_role_id).first()
@@ -188,9 +202,15 @@ def create_user(
         agency=body.agency,
         account=body.account,
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        print(f"[create_user] Error creating user: {e}")
+        raise HTTPException(400, f"Erro ao criar usuário: {e}")
+
     _log_action(db, 'CREATE_USER', target_email=body.email, admin=current_user)
     return _user_dict(user)
 
@@ -205,6 +225,14 @@ def update_user(
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(404, "Usuário não encontrado")
+
+    if not IS_SQLITE:
+        try:
+            db.execute(text("ALTER TABLE users ALTER COLUMN payment_method TYPE VARCHAR(50);"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
     data = body.model_dump(exclude_unset=True)
     if "password" in data and data["password"]:
         user.password_hash = auth.get_password_hash(data.pop("password"))
@@ -237,8 +265,14 @@ def update_user(
 
     for k, v in data.items():
         setattr(user, k, v)
-    db.commit()
-    db.refresh(user)
+    try:
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        print(f"[update_user] Error updating user: {e}")
+        raise HTTPException(400, f"Erro ao atualizar usuário: {e}")
+
     _log_action(db, 'UPDATE_USER', target_email=user.email, admin=current_user)
     return _user_dict(user)
 
