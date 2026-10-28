@@ -1459,4 +1459,54 @@ tbody td {
   50% { opacity: 0.88; transform: scale(1.05); }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ADMIN TOGGLE SWITCH (STANDARD)
+═══════════════════════════════════════════════════════════════════════════ */
+.toggle-switch,
+.toggle-switch-r {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+.toggle-switch input,
+.toggle-switch-r input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider,
+.toggle-slider-r {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .3s;
+  border-radius: 20px;
+}
+.toggle-slider:before,
+.toggle-slider-r:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+.toggle-switch input:checked + .toggle-slider,
+.toggle-switch-r input:checked + .toggle-slider-r {
+  background-color: var(--ml-indigo);
+}
+.toggle-switch input:checked + .toggle-slider:before,
+.toggle-switch-r input:checked + .toggle-slider-r:before {
+  transform: translateX(16px);
+}
+
+
 

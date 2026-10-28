@@ -2360,6 +2360,14 @@ const AdminPage = {
   async renderMileage() {
     const el = document.getElementById('admin-section-content');
     el.innerHTML = `
+      <style>
+        .toggle-switch-r { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .toggle-switch-r input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider-r { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 20px; }
+        .toggle-slider-r:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; }
+        .toggle-switch-r input:checked + .toggle-slider-r { background-color: var(--ml-indigo); }
+        .toggle-switch-r input:checked + .toggle-slider-r:before { transform: translateX(16px); }
+      </style>
       <div class="table-wrapper">
         <div class="table-header">
           <span class="card-title">🚗 Níveis de Quilometragem</span>
@@ -2414,10 +2422,10 @@ const AdminPage = {
           <td>
             <div style="display:flex;align-items:center;gap:8px;">
               <label class="toggle-switch-r">
-                <input type="checkbox" ${r.active ? 'checked' : ''} onchange="AdminPage.toggleMileageStatus(${r.id}, this.checked); this.closest('tr').dataset.status = this.checked ? 'active' : 'inactive'; AdminPage.applyCurrentFilter('mileage-tbody');">
+                <input type="checkbox" ${r.active !== false ? 'checked' : ''} onchange="AdminPage.toggleMileageStatus(${r.id}, this.checked); this.parentElement.nextElementSibling.textContent = this.checked ? 'Ativo' : 'Inativo'; this.closest('tr').dataset.status = this.checked ? 'active' : 'inactive'; AdminPage.applyCurrentFilter('mileage-tbody');">
                 <span class="toggle-slider-r"></span>
               </label>
-              <span style="font-size:14px;font-weight:500;">${r.active ? 'Ativo' : 'Inativo'}</span>
+              <span style="font-size:13px; font-weight:500; color:var(--text-2);">${r.active !== false ? 'Ativo' : 'Inativo'}</span>
             </div>
           </td>
           <td>
