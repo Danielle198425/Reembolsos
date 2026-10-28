@@ -7,8 +7,83 @@ import time
 from datetime import datetime, date
 from typing import Dict, List, Optional, Tuple, Any
 
-import requests
+try:
+    import requests
+except ImportError:
+    import urllib.request
+    import urllib.error
+    import urllib.parse
+
+    class _UrllibResponse:
+        def __init__(self, status_code, content, headers=None):
+            self.status_code = status_code
+            self.content = content
+            self.text = content.decode("utf-8", errors="replace") if isinstance(content, (bytes, bytearray)) else str(content or "")
+            self.headers = headers or {}
+
+        def json(self):
+            return json.loads(self.text)
+
+        def raise_for_status(self):
+            if 400 <= self.status_code < 600:
+                raise RuntimeError(f"HTTP Error {self.status_code}: {self.text}")
+
+    class _RequestsFallback:
+        @staticmethod
+        def get(url, headers=None, timeout=30):
+            req = urllib.request.Request(url, headers=headers or {})
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return _UrllibResponse(resp.status, resp.read(), dict(resp.headers))
+            except urllib.error.HTTPError as e:
+                return _UrllibResponse(e.code, e.read(), dict(e.headers))
+
+        @staticmethod
+        def post(url, headers=None, json=None, files=None, timeout=30):
+            headers = dict(headers or {})
+            data = None
+            if files:
+                boundary = "----WebKitFormBoundary" + hex(int(time.time() * 1000))[2:]
+                headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
+                body_parts = []
+                for field, file_info in files.items():
+                    filename, file_bytes, ctype = file_info
+                    part = (
+                        f"--{boundary}\r\n"
+                        f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+                        f"Content-Type: {ctype}\r\n\r\n"
+                    ).encode("utf-8") + file_bytes + b"\r\n"
+                    body_parts.append(part)
+                body_parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+                data = b"".join(body_parts)
+            elif json is not None:
+                import json as json_mod
+                headers["Content-Type"] = "application/json"
+                data = json_mod.dumps(json).encode("utf-8")
+
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return _UrllibResponse(resp.status, resp.read(), dict(resp.headers))
+            except urllib.error.HTTPError as e:
+                return _UrllibResponse(e.code, e.read(), dict(e.headers))
+
+        @staticmethod
+        def patch(url, headers=None, json=None, timeout=30):
+            headers = dict(headers or {})
+            import json as json_mod
+            data = json_mod.dumps(json).encode("utf-8") if json is not None else None
+            req = urllib.request.Request(url, data=data, headers=headers, method="PATCH")
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return _UrllibResponse(resp.status, resp.read(), dict(resp.headers))
+            except urllib.error.HTTPError as e:
+                return _UrllibResponse(e.code, e.read(), dict(e.headers))
+
+    requests = _RequestsFallback()
+
 from sqlalchemy.orm import Session
+
 
 import models
 from pdf_generator import generate_export_pdf

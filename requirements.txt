@@ -12,3 +12,5 @@ aiofiles==23.2.1
 python-dateutil==2.9.0
 pydantic[email]==2.7.1
 pypdf>=6.0.0
+requests>=2.31.0
+

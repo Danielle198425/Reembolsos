@@ -14,8 +14,11 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas, auth
 import storage
+import logging
 from pdf_generator import generate_expense_pdf
 from email_service import send_rejection_email
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/expenses", tags=["expenses"])
 
@@ -1226,44 +1229,55 @@ def bulk_send_sienge(
             raise HTTPException(400, f"A categoria '{cat_name}' (despesa #{exp.id}) não possui conta financeira Sienge configurada.")
 
     # 3. Agrupar por (user_id, company_id) para garantir 'um título por empresa por colaborador'
-    from services.sienge_service import process_sienge_bill_for_user_expenses, get_company_id_for_cost_center
+    try:
+        from services.sienge_service import process_sienge_bill_for_user_expenses, get_company_id_for_cost_center
+    except Exception as e:
+        logger.error(f"[bulk_send_sienge] Erro ao carregar serviço do Sienge: {e}", exc_info=True)
+        raise HTTPException(502, f"Erro ao inicializar serviço do Sienge: {e}")
 
     custom_due_date = body.get("due_date")
 
-    groups = {}
-    for exp in expenses:
-        cc_code = str(exp.cost_center.code if exp.cost_center else exp.cost_center_id).strip()
-        comp_id = get_company_id_for_cost_center(cc_code, db=db)
-        key = (exp.user_id, comp_id)
-        groups.setdefault(key, []).append(exp)
+    try:
+        groups = {}
+        for exp in expenses:
+            cc_code = str(exp.cost_center.code if exp.cost_center else exp.cost_center_id).strip()
+            comp_id = get_company_id_for_cost_center(cc_code, db=db)
+            key = (exp.user_id, comp_id)
+            groups.setdefault(key, []).append(exp)
 
-    created_titles = []
-    errors = []
+        created_titles = []
+        errors = []
 
-    for (u_id, comp_id), u_expenses in groups.items():
-        user = u_expenses[0].user
-        try:
-            res = process_sienge_bill_for_user_expenses(user, u_expenses, current_user, db, custom_due_date=custom_due_date)
-            created_titles.append(res)
-        except Exception as exc:
-            errors.append(f"Colaborador {user.name}: {exc}")
+        for (u_id, comp_id), u_expenses in groups.items():
+            user = u_expenses[0].user
+            try:
+                res = process_sienge_bill_for_user_expenses(user, u_expenses, current_user, db, custom_due_date=custom_due_date)
+                created_titles.append(res)
+            except Exception as exc:
+                logger.error(f"[bulk_send_sienge] Erro para colaborador {user.name}: {exc}", exc_info=True)
+                errors.append(f"Colaborador {user.name}: {exc}")
 
-    if errors and not created_titles:
-        raise HTTPException(502, f"Falha ao gerar títulos no Sienge: {'; '.join(errors)}")
+        if errors and not created_titles:
+            raise HTTPException(502, f"Falha ao gerar títulos no Sienge: {'; '.join(errors)}")
 
-    bill_ids_str = ", ".join(t["bill_id"] for t in created_titles)
-    msg = f"{len(created_titles)} título(s) gerado(s) com sucesso no Sienge (Nº {bill_ids_str}) para {len(expenses)} despesa(s)."
-    if errors:
-        msg += f" Porém, ocorreram erros em alguns grupos: {'; '.join(errors)}"
+        bill_ids_str = ", ".join(t["bill_id"] for t in created_titles)
+        msg = f"{len(created_titles)} título(s) gerado(s) com sucesso no Sienge (Nº {bill_ids_str}) para {len(expenses)} despesa(s)."
+        if errors:
+            msg += f" Porém, ocorreram erros em alguns grupos: {'; '.join(errors)}"
 
-    return {
-        "ok": True,
-        "success": True,
-        "title_number": bill_ids_str,
-        "titles": created_titles,
-        "errors": errors if errors else None,
-        "message": msg
-    }
+        return {
+            "ok": True,
+            "success": True,
+            "title_number": bill_ids_str,
+            "titles": created_titles,
+            "errors": errors if errors else None,
+            "message": msg
+        }
+    except HTTPException:
+        raise
+    except Exception as err:
+        logger.error(f"[bulk_send_sienge] Erro inesperado: {err}", exc_info=True)
+        raise HTTPException(502, f"Erro ao processar integração com o Sienge: {err}")
 
 
 @router.post("/{expense_id}/pay-sienge")
