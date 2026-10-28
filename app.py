@@ -94,6 +94,15 @@ def run_auto_migrations():
                 conn.execute(text("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_cost_center_id_fkey;"))
         except Exception as e:
             print(f"[migration] drop users_cost_center_id_fkey: {e}")
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_export_id_fkey;
+                    ALTER TABLE expenses ADD CONSTRAINT expenses_export_id_fkey FOREIGN KEY (export_id) REFERENCES exports(id) ON DELETE SET NULL;
+                """))
+        except Exception as e:
+            print(f"[migration] expenses_export_id_fkey ON DELETE SET NULL: {e}")
+
 
 
 IS_VERCEL = bool(os.environ.get("VERCEL"))

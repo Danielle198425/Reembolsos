@@ -437,16 +437,53 @@ def download_export(
 @router.delete("/{export_id}", status_code=204)
 def delete_export(
     export_id: int,
-    current_user: models.User = Depends(auth.require_admin),
+    current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
+    if current_user.role not in [models.UserRole.admin, models.UserRole.financeiro]:
+        raise HTTPException(403, "Apenas administradores e financeiro podem excluir relatórios.")
+
     export = db.query(models.Export).filter(models.Export.id == export_id).first()
     if not export:
         raise HTTPException(404, "Exportação não encontrada")
-    if export.file_path and os.path.exists(export.file_path):
-        os.remove(export.file_path)
-    db.delete(export)
-    db.commit()
+
+    try:
+        # Desvincula todas as despesas que apontam para esta exportação para não violar a FK
+        db.query(models.Expense).filter(models.Expense.export_id == export.id).update(
+            {models.Expense.export_id: None},
+            synchronize_session=False
+        )
+        db.flush()
+
+        # Remove arquivos do disco local e /tmp se existirem
+        if export.file_path:
+            candidates = [
+                export.file_path,
+                os.path.join("exports", os.path.basename(export.file_path)),
+                os.path.join("/tmp", export.file_path.lstrip("/")),
+                os.path.join("/tmp", "exports", os.path.basename(export.file_path)),
+            ]
+            for p in candidates:
+                if p and os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except Exception:
+                        pass
+
+            # Remove do Supabase Storage se habilitado
+            if storage.enabled():
+                try:
+                    storage._delete(export.file_path.lstrip("/"))
+                except Exception:
+                    pass
+
+        db.delete(export)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"[delete_export] Erro ao excluir exportação {export_id}: {e}")
+        raise HTTPException(500, f"Erro ao excluir relatório: {str(e)}")
+
 
 
 @router.post("/{export_id}/send-email")
