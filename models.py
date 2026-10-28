@@ -201,6 +201,7 @@ class MileageRate(Base):
     name = Column(String(100), nullable=False)
     rate = Column(Float, nullable=False)
     active = Column(Boolean, default=True)
+    applicable_functions = Column(Text, nullable=True)
 
 
 class RejectionReason(Base):

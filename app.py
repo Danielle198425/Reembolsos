@@ -59,6 +59,8 @@ _MIGRATIONS = [
 
     ("category_override_rules", "category_ids", "TEXT"),
     ("category_override_rules", "cost_center_ids", "TEXT"),
+
+    ("mileage_rates", "applicable_functions", "TEXT"),
 ]
 
 

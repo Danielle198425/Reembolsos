@@ -2387,9 +2387,24 @@ const AdminPage = {
   
   async populateMileageTable() {
     try {
-      const rates = await Api.getMileageRates();
+      let rates = await Api.getMileageRates();
+      // Ordenação numérica crescente por nível (ex: Nível 1, Nível 2, Nível 3, ...)
+      const extractLevelNumber = (name) => {
+        if (!name) return 999999;
+        const m = String(name).match(/(?:n[íi]vel\s*)?(\d+)/i);
+        return m ? parseInt(m[1], 10) : 999999;
+      };
+      rates.sort((a, b) => {
+        const numA = extractLevelNumber(a.name);
+        const numB = extractLevelNumber(b.name);
+        if (numA !== numB) return numA - numB;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
       // Keep in sync with _db for expenses.js usage
       _db.mileage_rates = rates;
+      if (window.ExpensesPage) window.ExpensesPage._mileageRates = rates;
+
       document.getElementById('mileage-tbody').innerHTML = rates.length === 0
         ? '<tr><td colspan="4" style="text-align:center;color:var(--text-4);">Nenhuma taxa cadastrada</td></tr>'
         : rates.map(r => `
@@ -2432,19 +2447,56 @@ const AdminPage = {
   
   async openMileageForm(id = null) {
     let rate = null;
+    let jobFunctions = [];
+    try {
+      jobFunctions = await Api.getJobFunctions();
+    } catch(e) {}
+
     if (id) {
-      try { const rates = await Api.getMileageRates(); rate = rates.find(r => r.id === id); } catch(e) {}
+      try { 
+        const rates = await Api.getMileageRates(); 
+        rate = rates.find(r => r.id === id); 
+      } catch(e) {}
+    }
+
+    let selectedFuncs = [];
+    if (rate?.applicable_functions) {
+      try {
+        selectedFuncs = typeof rate.applicable_functions === 'string' 
+          ? JSON.parse(rate.applicable_functions) 
+          : rate.applicable_functions;
+      } catch(e) {
+        selectedFuncs = rate.applicable_functions ? [rate.applicable_functions] : [];
+      }
+    } else if (rate?.name) {
+      const normName = (rate.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      selectedFuncs = jobFunctions.filter(jf => {
+        const normJf = (jf.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        return normName.includes(normJf);
+      }).map(jf => jf.name);
     }
     
     const html = `
       <div class="form-grid">
-        <div class="field required">
+        <div class="field required" style="grid-column: span 2;">
           <label>Nome / Nível</label>
-          <input type="text" id="mileage-name" value="${escHtml(rate?.name || '')}" placeholder="Ex: Veículo Passeio" />
+          <input type="text" id="mileage-name" value="${escHtml(rate?.name || '')}" placeholder="Ex: Nível 1 - Colaborador" />
         </div>
-        <div class="field required">
+        <div class="field required" style="grid-column: span 2;">
           <label>Valor por Km (R$)</label>
-          <input type="number" step="0.01" id="mileage-rate" value="${rate ? rate.rate : ''}" placeholder="Ex: 1.50" />
+          <input type="number" step="0.01" id="mileage-rate" value="${rate ? rate.rate : ''}" placeholder="Ex: 1.11" />
+        </div>
+        <div class="field" style="grid-column: span 2;">
+          <label style="margin-bottom:6px;display:block;">Funções Vinculadas a este Nível</label>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;">
+            ${jobFunctions.map(jf => `
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;background:#fff;padding:6px 12px;border-radius:6px;border:1px solid var(--border);">
+                <input type="checkbox" class="mileage-func-cb" value="${escHtml(jf.name)}" ${selectedFuncs.map(f => String(f).toLowerCase()).includes(jf.name.toLowerCase()) ? 'checked' : ''} />
+                <span>${escHtml(jf.name)}</span>
+              </label>
+            `).join('')}
+          </div>
+          <small style="color:var(--text-3);font-size:11px;display:block;margin-top:6px;">Se nenhuma função for marcada, o sistema identificará automaticamente pelo nome do nível (ex: Colaborador, Diretor, Gestor, Supervisor).</small>
         </div>
       </div>
       <div id="mileage-error" class="login-error hidden" style="margin-top:12px;"></div>
@@ -2460,15 +2512,22 @@ const AdminPage = {
       const name = document.getElementById('mileage-name').value.trim();
       const rateVal = parseFloat(document.getElementById('mileage-rate').value);
       if (!name || isNaN(rateVal)) { 
-        errEl.textContent = 'Preencha todos os campos.'; 
+        errEl.textContent = 'Preencha todos os campos obrigatórios.'; 
         errEl.classList.remove('hidden'); 
         return; 
       }
+      const checkedFuncs = Array.from(document.querySelectorAll('.mileage-func-cb:checked')).map(cb => cb.value);
+      const payload = {
+        name,
+        rate: rateVal,
+        applicable_functions: checkedFuncs.length > 0 ? JSON.stringify(checkedFuncs) : null
+      };
       try {
         if (id) {
-          await Api.updateMileageRate(id, { name, rate: rateVal });
+          await Api.updateMileageRate(id, payload);
         } else {
-          await Api.createMileageRate({ name, rate: rateVal, active: true });
+          payload.active = true;
+          await Api.createMileageRate(payload);
         }
         Modal.close();
         toast('Nível salvo com sucesso', 'success');

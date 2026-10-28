@@ -283,12 +283,14 @@ class MileageRateCreate(BaseModel):
     name: str
     rate: float
     active: bool = True
+    applicable_functions: Optional[str] = None
 
 
 class MileageRateUpdate(BaseModel):
     name: Optional[str] = None
     rate: Optional[float] = None
     active: Optional[bool] = None
+    applicable_functions: Optional[str] = None
 
 
 # ─── RejectionReason ─────────────────────────────────────────────────────────

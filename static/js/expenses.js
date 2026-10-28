@@ -11,6 +11,109 @@ const ExpensesPage = {
   sortDirection: 'desc',
   currentFilteredExpenses: [],
   _tbodyClickBound: false,
+  _mileageRates: null,
+
+  async ensureMileageRates() {
+    if (this._mileageRates && this._mileageRates.length > 0) {
+      return this._mileageRates;
+    }
+    if (window._db && Array.isArray(window._db.mileage_rates) && window._db.mileage_rates.length > 0) {
+      this._mileageRates = window._db.mileage_rates;
+      return this._mileageRates;
+    }
+    try {
+      const rates = await Api.getMileageRates();
+      if (Array.isArray(rates) && rates.length > 0) {
+        const extractLevelNumber = (name) => {
+          if (!name) return 999999;
+          const m = String(name).match(/(?:n[íi]vel\s*)?(\d+)/i);
+          return m ? parseInt(m[1], 10) : 999999;
+        };
+        rates.sort((a, b) => {
+          const numA = extractLevelNumber(a.name);
+          const numB = extractLevelNumber(b.name);
+          if (numA !== numB) return numA - numB;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+        this._mileageRates = rates;
+        if (window._db) {
+          window._db.mileage_rates = rates;
+        }
+        return rates;
+      }
+    } catch(e) {
+      console.warn('Erro ao carregar taxas de quilometragem:', e);
+    }
+    return [];
+  },
+
+  getMileageRateForUser(user) {
+    const rates = (this._mileageRates && this._mileageRates.length > 0)
+      ? this._mileageRates
+      : (window._db?.mileage_rates || []);
+    
+    const activeRates = rates.filter(r => r.active !== false && r.active !== 0 && r.active !== 'false');
+
+    const normalize = (str) => (str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+    let funcName = (user?.job_function?.name || user?.job_function_name || '').trim();
+    if (!funcName && user?.job_function_id && Array.isArray(window._db?.job_functions)) {
+      const found = window._db.job_functions.find(f => f.id === user.job_function_id);
+      if (found) funcName = (found.name || '').trim();
+    }
+
+    const normFunc = normalize(funcName);
+
+    if (normFunc && activeRates.length > 0) {
+      // 1. Direct match in applicable_functions
+      for (const r of activeRates) {
+        let funcs = [];
+        if (r.applicable_functions) {
+          if (Array.isArray(r.applicable_functions)) {
+            funcs = r.applicable_functions;
+          } else {
+            try {
+              const parsed = JSON.parse(r.applicable_functions);
+              if (Array.isArray(parsed)) funcs = parsed;
+            } catch(e) {
+              funcs = String(r.applicable_functions).split(',').map(s => s.trim());
+            }
+          }
+        }
+        for (const fn of funcs) {
+          const normFn = normalize(fn);
+          if (normFn && (normFn === normFunc || normFunc.includes(normFn) || normFn.includes(normFunc))) {
+            return { rate: parseFloat(r.rate), name: r.name, obj: r };
+          }
+        }
+      }
+
+      // 2. Match function name in rate name (e.g. "Nível 2 - Diretor" matches "diretor")
+      for (const r of activeRates) {
+        const normRateName = normalize(r.name);
+        if (normRateName.includes(normFunc) || (normFunc.length >= 4 && normRateName.includes(normFunc.slice(0, -1)))) {
+          return { rate: parseFloat(r.rate), name: r.name, obj: r };
+        }
+      }
+    }
+
+    // 3. Fallback: match "colaborador", "padrao", or "nivel 1"
+    const defaultRate = activeRates.find(r => {
+      const n = normalize(r.name);
+      return n.includes('colaborador') || n.includes('padrao') || n.includes('nivel 1') || n.includes('1');
+    }) || activeRates[0];
+
+    if (defaultRate) {
+      return { rate: parseFloat(defaultRate.rate), name: defaultRate.name, obj: defaultRate };
+    }
+
+    // Absolute fallback
+    return { rate: 1.11, name: 'Nível 1 - Colaborador', obj: null };
+  },
 
   switchScope(scope) {
     this._currentScope = scope;
@@ -302,6 +405,7 @@ const ExpensesPage = {
         Api.getCostCenters().catch(() => []),
         Api.getSiengeCostCenters().catch(() => []),
         Api.getUsers().catch(() => []),
+        this.ensureMileageRates().catch(() => []),
       ]);
       this.categories = categories || [];
       this.users = users || [];
@@ -1107,6 +1211,7 @@ const ExpensesPage = {
 
   async openForm(id = null, opts = {}) {
     await this._loadAux();
+    await this.ensureMileageRates();
 
     let expense = null;
     if (id) {
@@ -1612,7 +1717,7 @@ const ExpensesPage = {
   },
 
 
-  _onCategoryChange() {
+  async _onCategoryChange() {
     const sel = document.getElementById('ef-category');
     const opt = sel.options[sel.selectedIndex];
     const nf      = opt?.dataset.nf === 'true';
@@ -1668,23 +1773,12 @@ const ExpensesPage = {
     const limitWarn = document.getElementById('limit-warning');
     const limitText = document.getElementById('limit-warning-text');
     if (isKm) {
-      const rates = _db.mileage_rates || [];
-      const functionName = (App.user?.job_function?.name || App.user?.job_function_name || '').toLowerCase();
-      const isDiretor = functionName === 'diretor';
-      
+      await this.ensureMileageRates();
+      const rateInfo = this.getMileageRateForUser(App.user);
+      const rate = rateInfo.rate;
+      const formattedRate = rate.toFixed(2).replace('.', ',');
 
-      const level1Obj = rates.find(r => r.name.toLowerCase().includes('nível 1') || r.name.toLowerCase().includes('nivel 1') || r.name.toLowerCase().includes('1') || r.name.toLowerCase().includes('padrão') || r.id === 1);
-      const level2Obj = rates.find(r => r.name.toLowerCase().includes('nível 2') || r.name.toLowerCase().includes('nivel 2') || r.name.toLowerCase().includes('2') || r.id === 2);
-
-
-      const level1Rate = level1Obj ? level1Obj.rate : 1.50;
-      const level2Rate = level2Obj ? level2Obj.rate : 2.20;
-
-
-      const rate = isDiretor ? level2Rate : level1Rate;
-
-
-      limitText.textContent = `Taxa: R$ ${rate.toFixed(2)}/km · calculado automaticamente pelo mapa (${isDiretor ? 'Taxa Diretor - Nível 2' : 'Taxa Padrão - Nível 1'})`;
+      limitText.textContent = `Taxa: R$ ${formattedRate}/km · calculado automaticamente pelo mapa (${rateInfo.name})`;
       limitWarn.style.background = 'var(--blue-bg)';
       limitWarn.style.borderColor = '#BFDBFE';
       limitWarn.style.color = 'var(--blue-text)';
@@ -1930,20 +2024,9 @@ const ExpensesPage = {
 
 
       // Read rate from mileage_rates depending on user's job function
-      const rates = _db.mileage_rates || [];
-      const functionName = (App.user?.job_function?.name || App.user?.job_function_name || '').toLowerCase();
-      const isDiretor = functionName === 'diretor';
-      
-
-      const level1Obj = rates.find(r => r.name.toLowerCase().includes('nível 1') || r.name.toLowerCase().includes('nivel 1') || r.name.toLowerCase().includes('1') || r.name.toLowerCase().includes('padrão') || r.id === 1);
-      const level2Obj = rates.find(r => r.name.toLowerCase().includes('nível 2') || r.name.toLowerCase().includes('nivel 2') || r.name.toLowerCase().includes('2') || r.id === 2);
-
-
-      const level1Rate = level1Obj ? level1Obj.rate : 1.50;
-      const level2Rate = level2Obj ? level2Obj.rate : 2.20;
-
-
-      const rate = isDiretor ? level2Rate : level1Rate;
+      await this.ensureMileageRates();
+      const rateInfo = this.getMileageRateForUser(App.user);
+      const rate = rateInfo.rate;
 
 
       const isRoundTrip = document.getElementById('km-roundtrip')?.checked;
@@ -1956,6 +2039,7 @@ const ExpensesPage = {
         calcDist: calcDist.toFixed(2), 
         isRoundTrip, 
         rate, 
+        rateName: rateInfo.name,
         total, 
         origin, 
         dest 
@@ -1964,7 +2048,7 @@ const ExpensesPage = {
 
       // Update result chips
       document.getElementById('km-dist').textContent  = `${calcDist.toFixed(2)} km`;
-      document.getElementById('km-rate').textContent  = `R$ ${rate.toFixed(2)}`;
+      document.getElementById('km-rate').textContent  = `R$ ${rate.toFixed(2).replace('.', ',')}`;
       document.getElementById('km-total').textContent = fmt(total);
       document.getElementById('km-results').style.display = 'block';
 
@@ -2066,7 +2150,8 @@ const ExpensesPage = {
       amount      = parseFloat(this._kmData.total.toFixed(2));
       const roundTripText = this._kmData.isRoundTrip ? " (Ida e Volta)" : "";
       description = `Quilometragem: ${this._kmData.origin} → ${this._kmData.dest} (${this._kmData.calcDist} km)${roundTripText}`;
-      notes       = `${kmNotes} · Taxa R$ ${this._kmData.rate.toFixed(2)}/km · Total ${this._kmData.calcDist} km`;
+      const rateLabel = this._kmData.rateName ? ` (${this._kmData.rateName})` : '';
+      notes       = `${kmNotes} · Taxa R$ ${this._kmData.rate.toFixed(2).replace('.', ',')}/km${rateLabel} · Total ${this._kmData.calcDist} km`;
     } else {
       let amtStr  = document.getElementById('ef-amount').value || '';
       amount      = parseFloat(amtStr.replace('R$ ', '').replace(/\\./g, '').replace(',', '.'));

@@ -773,14 +773,32 @@ def list_mileage_rates(db: Session = Depends(get_db), current_user=Depends(auth.
     if not rates:
         # Seed defaults if empty
         defaults = [
-            models.MileageRate(name="Nível 1 - Colaborador", rate=1.50, active=True),
-            models.MileageRate(name="Nível 2 - Diretor", rate=2.20, active=True),
+            models.MileageRate(name="Nível 1 - Colaborador", rate=1.11, active=True, applicable_functions='["Colaborador"]'),
+            models.MileageRate(name="Nível 2 - Diretor", rate=1.36, active=True, applicable_functions='["Diretor"]'),
+            models.MileageRate(name="Nível 3 - Gestor e Supervisor", rate=1.36, active=True, applicable_functions='["Gestor", "Supervisor"]'),
         ]
         for r in defaults:
             db.add(r)
         db.commit()
         rates = db.query(models.MileageRate).all()
-    return [{"id": r.id, "name": r.name, "rate": r.rate, "active": r.active} for r in rates]
+
+    import re
+    def _extract_level(name: str) -> int:
+        m = re.search(r'(?:n[íi]vel\s*)?(\d+)', name or '', re.IGNORECASE)
+        return int(m.group(1)) if m else 999999
+
+    rates = sorted(rates, key=lambda r: (_extract_level(r.name), (r.name or '').lower()))
+
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "rate": r.rate,
+            "active": r.active,
+            "applicable_functions": getattr(r, 'applicable_functions', None)
+        }
+        for r in rates
+    ]
 
 
 @router.post("/mileage-rates", status_code=201)
@@ -793,7 +811,13 @@ def create_mileage_rate(
     db.add(rate)
     db.commit()
     db.refresh(rate)
-    return {"id": rate.id, "name": rate.name, "rate": rate.rate, "active": rate.active}
+    return {
+        "id": rate.id,
+        "name": rate.name,
+        "rate": rate.rate,
+        "active": rate.active,
+        "applicable_functions": getattr(rate, 'applicable_functions', None)
+    }
 
 
 @router.put("/mileage-rates/{rate_id}")
@@ -810,7 +834,13 @@ def update_mileage_rate(
         setattr(rate, k, v)
     db.commit()
     db.refresh(rate)
-    return {"id": rate.id, "name": rate.name, "rate": rate.rate, "active": rate.active}
+    return {
+        "id": rate.id,
+        "name": rate.name,
+        "rate": rate.rate,
+        "active": rate.active,
+        "applicable_functions": getattr(rate, 'applicable_functions', None)
+    }
 
 
 @router.delete("/mileage-rates/{rate_id}", status_code=204)
