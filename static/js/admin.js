@@ -96,6 +96,10 @@ const AdminPage = {
   },
 
   renderSection(section) {
+    if (section === 'policies') {
+      this._sectionCollapseStates = {};
+      this._overrideCardStates = {};
+    }
     switch(section) {
       case 'users': this.renderUsers(); break;
       case 'categories': this.renderCategories(); break;
@@ -3185,7 +3189,7 @@ const AdminPage = {
       }
 
       if (!this._sectionCollapseStates) this._sectionCollapseStates = {};
-      const ccIsCollapsed = !!this._sectionCollapseStates['cc-rules'];
+      const ccIsCollapsed = this._sectionCollapseStates['cc-rules'] !== undefined ? !!this._sectionCollapseStates['cc-rules'] : true;
 
       container.innerHTML = `
         <div style="border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);position:relative;z-index:20;">
@@ -3608,7 +3612,7 @@ const AdminPage = {
       }
 
       if (!this._sectionCollapseStates) this._sectionCollapseStates = {};
-      const catIsCollapsed = !!this._sectionCollapseStates['cat-rules'];
+      const catIsCollapsed = this._sectionCollapseStates['cat-rules'] !== undefined ? !!this._sectionCollapseStates['cat-rules'] : true;
 
       container.innerHTML = `
         <div style="border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);position:relative;z-index:10;">
@@ -4075,7 +4079,7 @@ const AdminPage = {
       }
 
       if (!this._sectionCollapseStates) this._sectionCollapseStates = {};
-      const overrideIsCollapsed = !!this._sectionCollapseStates['cat-override-rules'];
+      const overrideIsCollapsed = this._sectionCollapseStates['cat-override-rules'] !== undefined ? !!this._sectionCollapseStates['cat-override-rules'] : true;
 
       // Montagem do formulário com suporte a múltiplas linhas
       const rowsHtml = this._overrideFormRows.map(row => `
