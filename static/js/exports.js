@@ -23,8 +23,12 @@ const ExportsPage = {
     const teamScopeName = App.user?.role === 'aprovador' ? 'team' : 'financial';
     const teamScopeLabel = App.user?.role === 'aprovador' ? 'Time' : 'Financeiro';
     
-    const savedScope = localStorage.getItem('active_scope') || 'personal';
-    this._currentScope = isApproverOrAdmin ? savedScope : 'personal';
+    const savedScope = localStorage.getItem('active_scope');
+    if (savedScope) {
+      this._currentScope = isApproverOrAdmin ? savedScope : 'personal';
+    } else {
+      this._currentScope = isAdminOrFinance ? 'financial' : (App.user?.role === 'aprovador' ? 'team' : 'personal');
+    }
 
     const colSpan = isAdminOrFinance ? 7 : 5;
 

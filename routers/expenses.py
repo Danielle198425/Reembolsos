@@ -28,50 +28,50 @@ STATUS_TRANSITIONS = {
     # status_atual -> [roles permitidos] -> novo_status
     models.ExpenseStatus.rascunho: {
         "submit": (
-            [models.UserRole.usuario, models.UserRole.aprovador, models.UserRole.admin],
+            [models.UserRole.usuario, models.UserRole.aprovador, models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.aguardando_aprovacao
         )
     },
     models.ExpenseStatus.a_enviar: {
         "send": (
-            [models.UserRole.usuario, models.UserRole.aprovador, models.UserRole.admin],
+            [models.UserRole.usuario, models.UserRole.aprovador, models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.aguardando_aprovacao
         ),
-        # Usuário pode auto-enviar se for aprovador/admin
+        # Usuário pode auto-enviar se for aprovador/admin/financeiro
         "submit_own": (
-            [models.UserRole.usuario, models.UserRole.aprovador, models.UserRole.admin],
+            [models.UserRole.usuario, models.UserRole.aprovador, models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.aguardando_aprovacao
         ),
     },
     models.ExpenseStatus.aguardando_aprovacao: {
         "approve": (
-            [models.UserRole.aprovador, models.UserRole.admin],
+            [models.UserRole.aprovador, models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.aprovado
         ),
         "reject": (
-            [models.UserRole.aprovador, models.UserRole.admin],
+            [models.UserRole.aprovador, models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.rejeitado
         ),
     },
     models.ExpenseStatus.aprovado: {
         "finalize": (
-            [models.UserRole.admin],
+            [models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.finalizado
         ),
     },
     models.ExpenseStatus.aguardando_finalizacao: {
         "finalize": (
-            [models.UserRole.admin],
+            [models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.finalizado
         ),
         "pay": (
-            [models.UserRole.admin],
+            [models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.finalizado
         ),
     },
     models.ExpenseStatus.rejeitado: {
         "resubmit": (
-            [models.UserRole.usuario, models.UserRole.aprovador, models.UserRole.admin],
+            [models.UserRole.usuario, models.UserRole.aprovador, models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.aguardando_aprovacao
         ),
     },
@@ -79,9 +79,9 @@ STATUS_TRANSITIONS = {
 
 
 def _can_view(expense: models.Expense, user: models.User) -> bool:
-    if user.role in [models.UserRole.admin, models.UserRole.financeiro]:
+    if user.role == models.UserRole.admin:
         return True
-    if user.role == models.UserRole.aprovador:
+    if user.role in [models.UserRole.aprovador, models.UserRole.financeiro]:
         if expense.user_id == user.id:
             return True
         rules = []
@@ -106,7 +106,7 @@ def _can_view(expense: models.Expense, user: models.User) -> bool:
                 app_cc_ids = json.loads(user.approver_of)
             except Exception:
                 app_cc_ids = []
-        if not app_cc_ids and user.cost_center_id:
+        if not app_cc_ids and user.cost_center_id and user.role == models.UserRole.aprovador:
             app_cc_ids = [user.cost_center_id]
 
         app_func_ids = []
@@ -116,10 +116,15 @@ def _can_view(expense: models.Expense, user: models.User) -> bool:
             except Exception:
                 app_func_ids = []
 
-        if expense.user:
-            d_ok = not app_cc_ids or (expense.user.cost_center_id in app_cc_ids or expense.cost_center_id in app_cc_ids)
-            f_ok = not app_func_ids or (expense.user.job_function_id in app_func_ids)
-            return d_ok and f_ok
+        if app_cc_ids or app_func_ids:
+            if expense.user:
+                d_ok = not app_cc_ids or (expense.user.cost_center_id in app_cc_ids or expense.cost_center_id in app_cc_ids)
+                f_ok = not app_func_ids or (expense.user.job_function_id in app_func_ids)
+                return d_ok and f_ok
+            return False
+
+        if user.role == models.UserRole.financeiro:
+            return True
         return False
     return expense.user_id == user.id
 
@@ -205,7 +210,7 @@ def list_expenses(
         q = q.filter(models.Expense.user_id == current_user.id)
     elif scope in ["personal", "pessoal"]:
         q = q.filter(models.Expense.user_id == current_user.id)
-    elif current_user.role == models.UserRole.aprovador:
+    elif current_user.role in [models.UserRole.aprovador, models.UserRole.financeiro] and (getattr(current_user, 'approver_rules', None) or current_user.approver_of or current_user.approver_of_functions):
         if user_id:
             q = q.filter(models.Expense.user_id == user_id)
 
@@ -265,11 +270,17 @@ def list_expenses(
 
     if pending_only:
         if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
-            q = q.filter(models.Expense.status.in_([
-                models.ExpenseStatus.aguardando_aprovacao,
-                models.ExpenseStatus.aguardando_finalizacao,
-                models.ExpenseStatus.rejeitado,
-            ]))
+            q = q.filter(or_(
+                models.Expense.status.in_([
+                    models.ExpenseStatus.aguardando_aprovacao,
+                    models.ExpenseStatus.aguardando_finalizacao,
+                    models.ExpenseStatus.rejeitado,
+                ]),
+                and_(
+                    models.Expense.status == models.ExpenseStatus.finalizado,
+                    or_(models.Expense.sienge_title == None, models.Expense.sienge_title == '')
+                )
+            ))
         else:
             q = q.filter(models.Expense.status.in_([
                 models.ExpenseStatus.aguardando_aprovacao,
@@ -417,7 +428,7 @@ def update_expense(
     expense = models.Expense.filter(models.Expense.id == expense_id).first() if hasattr(models.Expense, 'filter') else db.query(models.Expense).filter(models.Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(404, "Despesa não encontrada")
-    if expense.user_id != current_user.id and current_user.role not in [models.UserRole.admin, models.UserRole.aprovador]:
+    if expense.user_id != current_user.id and current_user.role not in [models.UserRole.admin, models.UserRole.aprovador, models.UserRole.financeiro]:
         raise HTTPException(403, "Acesso negado")
     if expense.status in [models.ExpenseStatus.finalizado, models.ExpenseStatus.pago] and current_user.role != models.UserRole.admin:
         raise HTTPException(400, "Despesas finalizadas só podem ser editadas pelo administrador.")
@@ -549,8 +560,8 @@ def delete_expense(
     expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(404, "Despesa não encontrada")
-    if expense.user_id != current_user.id and current_user.role != models.UserRole.admin:
-        raise HTTPException(403, "Acesso negado para excluir esta despesa. Apenas o criador ou o administrador podem realizar esta ação.")
+    if expense.user_id != current_user.id and current_user.role not in [models.UserRole.admin, models.UserRole.financeiro]:
+        raise HTTPException(403, "Acesso negado para excluir esta despesa. Apenas o criador, administrador ou financeiro podem realizar esta ação.")
     db.delete(expense)
     db.commit()
 
@@ -588,7 +599,7 @@ def _transition(expense_id: int, action: str, current_user: models.User, db: Ses
             imp_name = admin_obj.name
 
     # Aprovador não pode aprovar/reprovar a própria despesa (administrador pode)
-    if action in ["approve", "reject"] and current_user.role == models.UserRole.aprovador:
+    if action in ["approve", "reject"] and current_user.role in [models.UserRole.aprovador, models.UserRole.financeiro]:
         if expense.user_id == current_user.id:
             raise HTTPException(403, "Aprovadores não possuem permissão para aprovar ou reprovar as suas próprias despesas.")
 
@@ -758,12 +769,12 @@ def reject_expense(
 
 
 @router.post("/{expense_id}/finalize")
-def finalize_expense(expense_id: int, request: Request, current_user=Depends(auth.require_admin), db=Depends(get_db)):
+def finalize_expense(expense_id: int, request: Request, current_user=Depends(auth.require_admin_or_finance), db=Depends(get_db)):
     return _transition(expense_id, "finalize", current_user, db, request=request)
 
 
 @router.post("/{expense_id}/pay")
-def pay_expense(expense_id: int, request: Request, current_user=Depends(auth.require_admin), db=Depends(get_db)):
+def pay_expense(expense_id: int, request: Request, current_user=Depends(auth.require_admin_or_finance), db=Depends(get_db)):
     return _transition(expense_id, "pay", current_user, db, request=request)
 
 
@@ -782,7 +793,7 @@ async def upload_receipt(
     expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(404, "Despesa não encontrada")
-    if expense.user_id != current_user.id and current_user.role != models.UserRole.admin:
+    if expense.user_id != current_user.id and current_user.role not in [models.UserRole.admin, models.UserRole.financeiro]:
         raise HTTPException(403, "Acesso negado")
 
     allowed_types = ["image/jpeg", "image/png", "image/gif", "application/pdf"]

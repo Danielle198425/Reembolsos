@@ -180,8 +180,12 @@ def create_user(
             name_lower = job_role.name.lower()
             if "admin" in name_lower:
                 inferred_role = models.UserRole.admin
+            elif "financ" in name_lower:
+                inferred_role = models.UserRole.financeiro
             elif "aprov" in name_lower:
                 inferred_role = models.UserRole.aprovador
+    elif body.role:
+        inferred_role = body.role
 
     user = models.User(
         name=body.name,
@@ -257,11 +261,15 @@ def update_user(
                 name_lower = job_role.name.lower()
                 if "admin" in name_lower:
                     inferred_role = models.UserRole.admin
+                elif "financ" in name_lower:
+                    inferred_role = models.UserRole.financeiro
                 elif "aprov" in name_lower:
                     inferred_role = models.UserRole.aprovador
         user.role = inferred_role
         if "role" in data:
             data.pop("role")
+    elif "role" in data and data["role"]:
+        user.role = data["role"]
 
     for k, v in data.items():
         setattr(user, k, v)
@@ -387,7 +395,7 @@ def list_audit_logs(
 def list_cost_centers(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
     all_active_ccs = db.query(models.CostCenter).filter(models.CostCenter.active == True).all()
 
-    if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
+    if current_user.role == models.UserRole.admin:
         return all_active_ccs
 
     rules = db.query(models.CostCenterRule).all()
@@ -623,7 +631,7 @@ def toggle_company_status(
 def list_categories(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
     all_active_cats = db.query(models.Category).filter(models.Category.active == True).all()
 
-    if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
+    if current_user.role == models.UserRole.admin:
         return all_active_cats
 
     cat_rules = db.query(models.CategoryRule).all()

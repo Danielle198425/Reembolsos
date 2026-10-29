@@ -810,8 +810,8 @@ const AdminPage = {
       const funcText = funcSelect ? (funcSelect.options[funcSelect.selectedIndex]?.text.toLowerCase() || '') : '';
       const isGestorOrDiretor = AdminPage.getFunctionRank(funcText) <= 2;
 
-      if (isApprover || isAdmin) {
-        if (isAdmin || (isApprover && isGestorOrDiretor)) {
+      if (isApprover || isAdmin || isFinance) {
+        if (isAdmin || isFinance || (isApprover && isGestorOrDiretor)) {
           approverRules = (AdminPage._approverRules || []).map(r => ({
             function_ids: (r.function_ids || []).map(Number),
             department_ids: (r.department_ids || []).map(Number)
@@ -824,7 +824,7 @@ const AdminPage = {
           }];
         }
 
-        if (isAdmin || (isApprover && isGestorOrDiretor)) {
+        if (isAdmin || isFinance || (isApprover && isGestorOrDiretor)) {
           if (approverRules.length === 0) {
             errEl.textContent = 'Adicione pelo menos uma regra de aprovação com Função e Departamento.';
             errEl.classList.remove('hidden');
@@ -1343,6 +1343,7 @@ const AdminPage = {
     const roleText = roleSelect.options[roleSelect.selectedIndex]?.text.toLowerCase() || '';
     const isApprover = roleText.includes('aprov');
     const isAdmin = roleText.includes('admin');
+    const isFinance = roleText.includes('financ');
     
     const funcText = funcSelect ? (funcSelect.options[funcSelect.selectedIndex]?.text.toLowerCase() || '') : '';
     const userRank = AdminPage.getFunctionRank(funcText);
@@ -1352,7 +1353,7 @@ const AdminPage = {
     const addBtn = document.getElementById('btn-add-approver-rule');
     const deptFixed = document.getElementById('scope-dept-fixed');
 
-    if (isApprover || isAdmin) {
+    if (isApprover || isAdmin || isFinance) {
       scopeFields.style.display = 'grid';
       
       // "+" button: only for diretor or gestor
@@ -1367,7 +1368,7 @@ const AdminPage = {
       }
 
       const allDeptMultis = document.querySelectorAll('.scope-dept-multi');
-      if (isAdmin || (isApprover && isGestorOrDiretor)) {
+      if (isAdmin || isFinance || (isApprover && isGestorOrDiretor)) {
         allDeptMultis.forEach(el => el.style.display = 'block');
         if (deptFixed) deptFixed.style.display = 'none';
       } else {

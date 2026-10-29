@@ -74,12 +74,55 @@ def get_summary(
             models.Expense.status == models.ExpenseStatus.aguardando_aprovacao
         ).count()
     elif scope in ["all", "financial", "financeiro"] and is_admin_fin:
-        # Escopo geral financeiro: apenas despesas que ainda aguardam aprovação ou finalização
-        pending_tasks = db.query(models.Expense).filter(
-            models.Expense.status.in_([
-                models.ExpenseStatus.aguardando_aprovacao,
-                models.ExpenseStatus.aguardando_finalizacao
-            ])
+        if current_user.role != models.UserRole.admin and (getattr(current_user, 'approver_rules', None) or current_user.approver_of or current_user.approver_of_functions):
+            import json
+            rules = []
+            if getattr(current_user, 'approver_rules', None):
+                try: rules = json.loads(current_user.approver_rules)
+                except Exception: pass
+            if rules:
+                rule_conditions = []
+                for r in rules:
+                    f_ids = r.get("function_ids", [])
+                    d_ids = r.get("department_ids", [])
+                    cond_f = models.User.job_function_id.in_(f_ids) if f_ids else None
+                    cond_d = or_(models.User.cost_center_id.in_(d_ids), models.Expense.cost_center_id.in_(d_ids)) if d_ids else None
+                    if cond_f is not None and cond_d is not None:
+                        rule_conditions.append(and_(cond_f, cond_d))
+                    elif cond_f is not None:
+                        rule_conditions.append(cond_f)
+                    elif cond_d is not None:
+                        rule_conditions.append(cond_d)
+                if rule_conditions:
+                    base = base.join(models.User, models.Expense.user_id == models.User.id).filter(or_(*rule_conditions))
+            else:
+                app_cc_ids = []
+                if current_user.approver_of:
+                    try: app_cc_ids = json.loads(current_user.approver_of)
+                    except Exception: pass
+                app_func_ids = []
+                if current_user.approver_of_functions:
+                    try: app_func_ids = json.loads(current_user.approver_of_functions)
+                    except Exception: pass
+                if app_cc_ids or app_func_ids:
+                    base = base.join(models.User, models.Expense.user_id == models.User.id)
+                    if app_cc_ids:
+                        base = base.filter(or_(models.User.cost_center_id.in_(app_cc_ids), models.Expense.cost_center_id.in_(app_cc_ids)))
+                    if app_func_ids:
+                        base = base.filter(models.User.job_function_id.in_(app_func_ids))
+
+        # Escopo geral financeiro: apenas despesas que ainda aguardam aprovação, finalização ou título Sienge
+        pending_tasks = base.filter(
+            or_(
+                models.Expense.status.in_([
+                    models.ExpenseStatus.aguardando_aprovacao,
+                    models.ExpenseStatus.aguardando_finalizacao
+                ]),
+                and_(
+                    models.Expense.status == models.ExpenseStatus.finalizado,
+                    or_(models.Expense.sienge_title == None, models.Expense.sienge_title == '')
+                )
+            )
         ).count()
     else:
         # Escopo pessoal: despesas rejeitadas que precisam de correção pelo próprio usuário

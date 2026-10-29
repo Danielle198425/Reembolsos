@@ -85,7 +85,13 @@ def require_admin(current_user: models.User = Depends(get_current_user)):
     return current_user
 
 
+def require_admin_or_finance(current_user: models.User = Depends(get_current_user)):
+    if current_user.role not in [models.UserRole.admin, models.UserRole.financeiro]:
+        raise HTTPException(status_code=403, detail="Acesso permitido apenas para Administrador e Financeiro")
+    return current_user
+
+
 def require_approver(current_user: models.User = Depends(get_current_user)):
-    if current_user.role not in [models.UserRole.admin, models.UserRole.aprovador]:
+    if current_user.role not in [models.UserRole.admin, models.UserRole.aprovador, models.UserRole.financeiro]:
         raise HTTPException(status_code=403, detail="Acesso negado")
     return current_user

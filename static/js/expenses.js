@@ -137,8 +137,12 @@ const ExpensesPage = {
     const teamScopeName = App.user?.role === 'aprovador' ? 'team' : 'financial';
     const teamScopeLabel = App.user?.role === 'aprovador' ? 'Time' : 'Financeiro';
     
-    const savedScope = localStorage.getItem('active_scope') || 'personal';
-    this._currentScope = isApproverOrAdmin ? savedScope : 'personal';
+    const savedScope = localStorage.getItem('active_scope');
+    if (savedScope) {
+      this._currentScope = isApproverOrAdmin ? savedScope : 'personal';
+    } else {
+      this._currentScope = isAdminOrFinance ? 'financial' : (App.user?.role === 'aprovador' ? 'team' : 'personal');
+    }
 
     const colSpan = isAdminOrFinance ? 10 : 9;
     const isInitialCollapsed = localStorage.getItem('ml_expense_desc_collapsed') !== 'false';
@@ -543,7 +547,16 @@ const ExpensesPage = {
       }
 
       if (this.currentTab === 'pending') {
-        expenses = expenses.filter(e => e.status === 'aguardando_aprovacao' || e.status === 'rejeitado');
+        if (isAdminOrFinance) {
+          expenses = expenses.filter(e => 
+            e.status === 'aguardando_aprovacao' || 
+            e.status === 'aguardando_finalizacao' || 
+            (e.status === 'finalizado' && !e.sienge_title) || 
+            e.status === 'rejeitado'
+          );
+        } else {
+          expenses = expenses.filter(e => e.status === 'aguardando_aprovacao' || e.status === 'rejeitado');
+        }
       }
 
 
@@ -776,12 +789,12 @@ const ExpensesPage = {
     const isFinalized = e.status === 'finalizado' || e.status === 'pago';
     const canEdit = App.user?.role === 'admin' || (!isFinalized && (e.user_id === App.user?.id || App.user?.role === 'aprovador' || App.user?.role === 'financeiro'));
     const isSelf = e.user_id === App.user?.id;
-    const canApprove = (App.user?.role === 'admin' || (App.user?.role === 'aprovador' && !isSelf)) &&
+    const canApprove = (App.user?.role === 'admin' || App.user?.role === 'financeiro' || (App.user?.role === 'aprovador' && !isSelf)) &&
                        e.status === 'aguardando_aprovacao';
-    const canFinalize = false; // Finalização ocorre unicamente via execução de relatório
+    const canFinalize = isAdminOrFinance && (e.status === 'aguardando_finalizacao' || e.status === 'aprovado');
     const canPay = false;
-    const canDelete = (e.user_id === App.user?.id || App.user?.role === 'admin');
-    const canResubmit = e.status === 'rejeitado' && (e.user_id === App.user?.id || App.user?.role === 'admin');
+    const canDelete = (e.user_id === App.user?.id || isAdminOrFinance);
+    const canResubmit = e.status === 'rejeitado' && (e.user_id === App.user?.id || isAdminOrFinance);
 
     let statusTooltip = '';
     let statusExtraClass = '';
@@ -826,15 +839,16 @@ const ExpensesPage = {
 
     const isStatusApproved = e.status === 'aprovado';
     const isStatusFinalized = e.status === 'finalizado';
+    const isStatusWaitingFin = e.status === 'aguardando_finalizacao';
     const isStatusRejected = e.status === 'rejeitado';
-    const isSelectable = isStatusApproved || isStatusFinalized;
+    const isSelectable = isStatusApproved || isStatusFinalized || isStatusWaitingFin;
     const checkboxTitle = isStatusRejected
       ? 'Despesas rejeitadas não podem ser selecionadas'
-      : (isStatusApproved
-        ? 'Selecionar despesa aprovada para exportação'
+      : (isStatusApproved || isStatusWaitingFin
+        ? 'Selecionar despesa para exportação / finalização'
         : (isStatusFinalized
           ? 'Selecionar despesa finalizada para exportação ou gerar título'
-          : 'Apenas despesas aprovadas ou finalizadas podem ser selecionadas para exportação'));
+          : 'Apenas despesas aprovadas, aguardando finalização ou finalizadas podem ser selecionadas'));
     const checkboxDisabled = !isSelectable ? 'disabled style="cursor:not-allowed;opacity:0.35;"' : '';
     const isChecked = checkedIds && checkedIds.has(e.id);
 
