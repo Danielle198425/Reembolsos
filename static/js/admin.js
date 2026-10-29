@@ -5,7 +5,9 @@ const AdminPage = {
   currentSection: 'users',
 
   render() {
-    if (App.user?.role !== 'admin') {
+    const isFinanceiro = App.user?.role === 'financeiro';
+    const isAdmin = App.user?.role === 'admin';
+    if (!isAdmin && !isFinanceiro) {
       document.getElementById('page-admin').innerHTML =
         `<div class="empty-state"><span class="empty-icon">🔒</span><p>Acesso restrito a administradores</p></div>`;
       return;
@@ -16,6 +18,17 @@ const AdminPage = {
     } catch (e) {}
 
     this.currentSection = localStorage.getItem('ml_admin_current_section') || 'users';
+    if (isFinanceiro && ['audit', 'unlock', 'impersonate', 'email-closing', 'email-payment'].includes(this.currentSection)) {
+      this.currentSection = 'users';
+      localStorage.setItem('ml_admin_current_section', 'users');
+    }
+
+    const adminPageEl = document.getElementById('page-admin');
+    if (isFinanceiro) {
+      adminPageEl.classList.add('admin-financeiro-mode');
+    } else {
+      adminPageEl.classList.remove('admin-financeiro-mode');
+    }
 
     document.getElementById('page-admin').innerHTML = `
       <div class="page-header">
@@ -47,6 +60,7 @@ const AdminPage = {
           <div class="admin-nav-item" data-section="rejection-reasons" id="anav-rejection-reasons">Motivos de rejeição</div>
 
           
+          ${isFinanceiro ? '' : `
           <div class="admin-section-label">SEGURANÇA</div>
           <div class="admin-nav-item" id="anav-audit">Logs de Auditoria</div>
           <div class="admin-nav-item" id="anav-unlock">Desbloquear Usuários</div>
@@ -55,6 +69,7 @@ const AdminPage = {
           <div class="admin-section-label">MODELOS DE E-MAIL</div>
           <div class="admin-nav-item" data-section="email-closing" id="anav-email-closing">Datas de fechamento</div>
           <div class="admin-nav-item" data-section="email-payment" id="anav-email-payment">Data de Pagamento</div>
+          `}
         </aside>
 
         <div class="admin-content" id="admin-section-content">
@@ -96,6 +111,14 @@ const AdminPage = {
   },
 
   renderSection(section) {
+    if (App.user?.role === 'financeiro') {
+      if (['audit', 'unlock', 'impersonate', 'email-closing', 'email-payment'].includes(section)) {
+        this.currentSection = 'users';
+        localStorage.setItem('ml_admin_current_section', 'users');
+        this.renderSection('users');
+        return;
+      }
+    }
     if (section === 'policies') {
       this._sectionCollapseStates = {};
       this._overrideCardStates = {};
@@ -120,6 +143,92 @@ const AdminPage = {
       case 'email-closing': this.renderEmailTemplates('closing_dates'); break;
       case 'email-payment': this.renderEmailTemplates('payment_date'); break;
     }
+    if (App.user?.role === 'financeiro') {
+      this._observeFinanceReadOnly();
+    }
+  },
+
+  _observeFinanceReadOnly() {
+    if (App.user?.role !== 'financeiro') return;
+
+    if (!document.getElementById('financeiro-admin-style')) {
+      const style = document.createElement('style');
+      style.id = 'financeiro-admin-style';
+      style.textContent = `
+        .admin-financeiro-mode #btn-add-user,
+        .admin-financeiro-mode [id^="btn-new"],
+        .admin-financeiro-mode [id^="btn-add"],
+        .admin-financeiro-mode [id^="btn-sync"],
+        .admin-financeiro-mode [id^="btn-save"],
+        .admin-financeiro-mode [id^="btn-upload"],
+        .admin-financeiro-mode .action-btn.danger,
+        .admin-financeiro-mode button.danger,
+        .admin-financeiro-mode button[title*="Excluir"],
+        .admin-financeiro-mode button[title*="Editar"],
+        .admin-financeiro-mode button[title*="Novo"],
+        .admin-financeiro-mode button[title*="Nova"],
+        .admin-financeiro-mode button[title*="Salvar"],
+        .admin-financeiro-mode button[title*="Sincronizar"],
+        .admin-financeiro-mode .toggle-switch,
+        .admin-financeiro-mode input[type="file"],
+        .admin-financeiro-mode .override-card-actions {
+          display: none !important;
+        }
+        .admin-financeiro-mode #admin-section-content input:not([id^="filter"]),
+        .admin-financeiro-mode #admin-section-content select:not([id^="filter"]),
+        .admin-financeiro-mode #admin-section-content textarea {
+          pointer-events: none !important;
+          background-color: var(--surface-2, #f3f4f6) !important;
+          opacity: 0.85 !important;
+          cursor: not-allowed !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const content = document.getElementById('admin-section-content');
+    if (!content) return;
+
+    const applyReadOnly = () => {
+      if (!content.querySelector('.finance-consult-banner')) {
+        const banner = document.createElement('div');
+        banner.className = 'finance-consult-banner';
+        banner.style.cssText = 'margin-bottom:16px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);color:var(--text-1);padding:10px 14px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:8px;';
+        banner.innerHTML = `<span style="font-size:16px;">ℹ️</span><span><strong>Modo Consulta (Perfil Financeiro):</strong> Permissão de consulta concedida. Alterações, inclusões, exclusões e edições são restritas ao perfil Administrador.</span>`;
+        content.insertBefore(banner, content.firstChild);
+      }
+
+      // Hide Ações column if table exists
+      content.querySelectorAll('table').forEach(table => {
+        const ths = table.querySelectorAll('thead th');
+        let actionsColIndex = -1;
+        ths.forEach((th, idx) => {
+          const txt = th.textContent.trim().toLowerCase();
+          if (txt.includes('ações') || txt.includes('acoes')) {
+            actionsColIndex = idx;
+            th.style.display = 'none';
+          }
+        });
+        if (actionsColIndex !== -1) {
+          table.querySelectorAll('tbody tr').forEach(tr => {
+            const tds = tr.querySelectorAll('td');
+            if (tds[actionsColIndex]) {
+              tds[actionsColIndex].style.display = 'none';
+            }
+          });
+        }
+      });
+    };
+
+    applyReadOnly();
+
+    if (this._financeObserver) {
+      this._financeObserver.disconnect();
+    }
+    this._financeObserver = new MutationObserver(() => {
+      applyReadOnly();
+    });
+    this._financeObserver.observe(content, { childList: true, subtree: true });
   },
 
   async renderAuditLogs() {
@@ -646,6 +755,11 @@ const AdminPage = {
   },
 
   async openUserForm(id = null) {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     let user = null;
     let ccs = await Api.getSiengeDepartments();
     let jobRoles = await Api.getJobRoles();
@@ -916,6 +1030,11 @@ const AdminPage = {
   },
 
   deleteUserConfirm(id, name) {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     Modal.confirm('Confirmar ação', `Deseja realmente excluir o cadastro do usuário ${name}? Esta ação não poderá ser desfeita.`, async () => {
       try {
         await Api.deleteUser(id);
@@ -1511,6 +1630,11 @@ const AdminPage = {
   },
 
   async openCategoryForm(id = null) {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     let cat = null;
     if (id) {
       const cats = await Api.getCategories();
@@ -1752,6 +1876,11 @@ const AdminPage = {
   },
 
   async syncSiengeDepartments() {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     toast('Sincronizando departamentos...', 'info');
     await Api.syncSiengeDepartments();
     toast('Sincronização concluída.', 'success');
@@ -1829,6 +1958,11 @@ const AdminPage = {
     },
 
     async openRoleForm(id = null) {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
       let role = null;
       if (id) {
         const roles = await Api.getJobRoles();
@@ -1951,6 +2085,11 @@ const AdminPage = {
     },
 
     async openFuncForm(id = null) {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
       let func = null;
       if (id) {
         const funcs = await Api.getJobFunctions();
@@ -2167,6 +2306,11 @@ const AdminPage = {
   },
 
   async syncSiengeCostCenters() {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     toast('Sincronizando centros de custo...', 'info');
     await Api.syncSiengeCostCenters();
     toast('Sincronização concluída.', 'success');
@@ -2261,6 +2405,11 @@ const AdminPage = {
   },
 
   async syncSiengeCompanies() {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     toast('Sincronizando empresas...', 'info');
     await Api.syncSiengeCompanies();
     toast('Sincronização concluída.', 'success');
@@ -2352,6 +2501,11 @@ const AdminPage = {
   },
 
   async syncSiengeApportionments() {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     toast('Sincronizando apropriações...', 'info');
     await Api.syncSiengeFinancialPlans();
     toast('Sincronização concluída.', 'success');
@@ -2455,6 +2609,11 @@ const AdminPage = {
   },
   
   async openMileageForm(id = null) {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     let rate = null;
     let jobFunctions = [];
     try {
@@ -2592,6 +2751,11 @@ const AdminPage = {
   },
 
   saveLogo() {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     const fileInput = document.getElementById('logo-file');
     if (fileInput.files && fileInput.files[0]) {
       const reader = new FileReader();
@@ -2830,6 +2994,11 @@ const AdminPage = {
   },
 
   async openRejectionReasonForm(id = null) {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     let reason = null;
     if (id) {
       try { const reasons = await Api.getRejectionReasons(); reason = reasons.find(r => r.id === id); } catch(e) {}
@@ -3060,6 +3229,11 @@ const AdminPage = {
   },
 
   async savePolicyForm() {
+    if (App.user?.role === 'financeiro') {
+      toast('Perfil Financeiro possui permissão apenas de consulta nesta tela.', 'info');
+      return;
+    }
+
     const key = document.getElementById('pol-key').value.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     const desc = document.getElementById('pol-desc').value.trim();
     const value = document.getElementById('pol-value').value.trim();

@@ -45,7 +45,7 @@ STATUS_TRANSITIONS = {
     },
     models.ExpenseStatus.aguardando_aprovacao: {
         "approve": (
-            [models.UserRole.aprovador, models.UserRole.admin, models.UserRole.financeiro],
+            [models.UserRole.aprovador, models.UserRole.admin],
             models.ExpenseStatus.aprovado
         ),
         "reject": (
@@ -68,6 +68,10 @@ STATUS_TRANSITIONS = {
             [models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.finalizado
         ),
+        "reject": (
+            [models.UserRole.admin, models.UserRole.financeiro],
+            models.ExpenseStatus.rejeitado
+        ),
     },
     models.ExpenseStatus.rejeitado: {
         "resubmit": (
@@ -79,9 +83,9 @@ STATUS_TRANSITIONS = {
 
 
 def _can_view(expense: models.Expense, user: models.User) -> bool:
-    if user.role == models.UserRole.admin:
+    if user.role in [models.UserRole.admin, models.UserRole.financeiro]:
         return True
-    if user.role in [models.UserRole.aprovador, models.UserRole.financeiro]:
+    if user.role == models.UserRole.aprovador:
         if expense.user_id == user.id:
             return True
         rules = []
@@ -210,7 +214,7 @@ def list_expenses(
         q = q.filter(models.Expense.user_id == current_user.id)
     elif scope in ["personal", "pessoal"]:
         q = q.filter(models.Expense.user_id == current_user.id)
-    elif current_user.role in [models.UserRole.aprovador, models.UserRole.financeiro] and (getattr(current_user, 'approver_rules', None) or current_user.approver_of or current_user.approver_of_functions):
+    elif current_user.role == models.UserRole.aprovador:
         if user_id:
             q = q.filter(models.Expense.user_id == user_id)
 

@@ -229,7 +229,7 @@ function getRequestedPage() {
 
 function navigate(page, updateHistory = true) {
   if (!pages.includes(page)) page = 'dashboard';
-  if (page === 'admin' && App.user?.role !== 'admin') page = 'dashboard';
+  if (page === 'admin' && !['admin', 'financeiro'].includes(App.user?.role)) page = 'dashboard';
 
   App.currentPage = page;
   localStorage.setItem('ml_current_page', page);
@@ -324,7 +324,7 @@ function showApp(user) {
     bar.classList.add('hidden');
   }
 
-  if (user.role === 'admin') {
+  if (['admin', 'financeiro'].includes(user.role)) {
     document.getElementById('nav-admin').classList.remove('hidden');
   } else {
     document.getElementById('nav-admin').classList.add('hidden');
@@ -338,7 +338,7 @@ function showApp(user) {
 
   // Navigate to requested page (redirect if non-admin on admin route)
   let initialPage = getRequestedPage();
-  if (initialPage === 'admin' && user.role !== 'admin') {
+  if (initialPage === 'admin' && !['admin', 'financeiro'].includes(user.role)) {
     initialPage = 'dashboard';
   }
   navigate(initialPage, false);

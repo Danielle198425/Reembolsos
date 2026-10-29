@@ -395,7 +395,7 @@ def list_audit_logs(
 def list_cost_centers(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
     all_active_ccs = db.query(models.CostCenter).filter(models.CostCenter.active == True).all()
 
-    if current_user.role == models.UserRole.admin:
+    if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
         return all_active_ccs
 
     rules = db.query(models.CostCenterRule).all()
@@ -631,7 +631,7 @@ def toggle_company_status(
 def list_categories(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
     all_active_cats = db.query(models.Category).filter(models.Category.active == True).all()
 
-    if current_user.role == models.UserRole.admin:
+    if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
         return all_active_cats
 
     cat_rules = db.query(models.CategoryRule).all()
@@ -1232,7 +1232,7 @@ def save_payment_calendar(
 # ─── REGRAS POR CENTRO DE CUSTO ──────────────────────────────────────────────
 @router.get("/cost-center-rules")
 def list_cost_center_rules(
-    current_user: models.User = Depends(auth.require_admin),
+    current_user: models.User = Depends(auth.require_admin_or_finance),
     db: Session = Depends(get_db)
 ):
     rules = db.query(models.CostCenterRule).order_by(models.CostCenterRule.id.desc()).all()
@@ -1343,7 +1343,7 @@ def delete_cost_center_rule(
 # ─── REGRAS POR APROPRIAÇÃO FINANCEIRA ──────────────────────────────────────
 @router.get("/apportionment-rules")
 def list_apportionment_rules(
-    current_user: models.User = Depends(auth.require_admin),
+    current_user: models.User = Depends(auth.require_admin_or_finance),
     db: Session = Depends(get_db)
 ):
     rules = db.query(models.ApportionmentRule).order_by(models.ApportionmentRule.id.desc()).all()
@@ -1443,7 +1443,7 @@ def delete_apportionment_rule(
 # ─── REGRAS POR CATEGORIA ───────────────────────────────────────────────────
 @router.get("/category-rules")
 def list_category_rules(
-    current_user: models.User = Depends(auth.require_admin),
+    current_user: models.User = Depends(auth.require_admin_or_finance),
     db: Session = Depends(get_db)
 ):
     rules = db.query(models.CategoryRule).order_by(models.CategoryRule.id.desc()).all()
@@ -1550,7 +1550,7 @@ def delete_category_rule(
 # ─── REGRAS DE ALTERAÇÃO NA CATEGORIA ─────────────────────────────────────────
 @router.get("/category-override-rules")
 def list_category_override_rules(
-    current_user: models.User = Depends(auth.require_admin),
+    current_user: models.User = Depends(auth.require_admin_or_finance),
     db: Session = Depends(get_db)
 ):
     from pdf_generator import _get_sienge_plans_map, format_apportionment_code
