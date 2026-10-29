@@ -86,11 +86,21 @@ def _user_dict(u: models.User) -> dict:
     dept_info = _get_department_info(u.cost_center_id)
     dept_name = dept_info["name"] if dept_info else (u.cost_center.name if u.cost_center else None)
 
+    effective_role = u.role.value if hasattr(u.role, 'value') else u.role
+    if getattr(u, 'job_role', None):
+        jr_name = (u.job_role.name or "").lower()
+        if "financ" in jr_name:
+            effective_role = "financeiro"
+        elif "admin" in jr_name:
+            effective_role = "admin"
+        elif "aprov" in jr_name:
+            effective_role = "aprovador"
+
     return {
         "id": u.id,
         "name": u.name,
         "email": u.email,
-        "role": u.role.value if hasattr(u.role, 'value') else u.role,
+        "role": effective_role,
         "cost_center_id": u.cost_center_id,
         "department_id": u.cost_center_id,
         "department_name": dept_name,
@@ -336,20 +346,38 @@ def impersonate_user(
         "impersonator_id": current_user.id,
         "impersonator_name": current_user.name
     })
+
+    effective_role = user.role.value if hasattr(user.role, 'value') else user.role
+    if getattr(user, 'job_role', None):
+        jr_name = (user.job_role.name or "").lower()
+        if "financ" in jr_name:
+            effective_role = "financeiro"
+            if user.role != models.UserRole.financeiro:
+                user.role = models.UserRole.financeiro
+                try: db.commit()
+                except: db.rollback()
+        elif "admin" in jr_name:
+            effective_role = "admin"
+            if user.role != models.UserRole.admin:
+                user.role = models.UserRole.admin
+                try: db.commit()
+                except: db.rollback()
+        elif "aprov" in jr_name:
+            effective_role = "aprovador"
+            if user.role != models.UserRole.aprovador:
+                user.role = models.UserRole.aprovador
+                try: db.commit()
+                except: db.rollback()
+
     _log_action(db, 'IMPERSONATE_USER', target_email=user.email, admin=current_user,
-                details=f"Iniciou modo 'Ver como' do perfil {user.name} ({user.role.value if hasattr(user.role, 'value') else user.role})")
+                details=f"Iniciou modo 'Ver como' do perfil {user.name} ({effective_role})")
+
+    u_dict = _user_dict(user)
+    u_dict["role"] = effective_role
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "role": user.role.value if hasattr(user.role, 'value') else user.role,
-            "cost_center_id": user.cost_center_id,
-            "job_function_id": getattr(user, 'job_function_id', None),
-            "job_role_id": getattr(user, 'job_role_id', None),
-        }
+        "user": u_dict
     }
 
 

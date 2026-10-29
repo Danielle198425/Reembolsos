@@ -478,7 +478,14 @@ const AdminPage = {
       quickSelect.innerHTML = `
         <option value="">Selecione um usuário para simulação rápida...</option>
         ${users.filter(u => u.active !== false).map(u => {
-          const roleLabel = ROLE_LABELS[u.role] || u.role;
+          let role = u.role;
+          if (u.job_role?.name) {
+            const jrn = u.job_role.name.toLowerCase();
+            if (jrn.includes('financ')) role = 'financeiro';
+            else if (jrn.includes('admin')) role = 'admin';
+            else if (jrn.includes('aprov')) role = 'aprovador';
+          }
+          const roleLabel = ROLE_LABELS[role] || role;
           const isCurrent = (App.user && App.user.id === u.id);
           const dept = getDeptName(u);
           const deptDisplay = (dept && dept !== '—') ? ` — ${escHtml(dept)}` : '';
@@ -518,14 +525,21 @@ const AdminPage = {
         tbody.innerHTML = filtered.map(u => {
           const isCurrent = (App.user && App.user.id === u.id);
           const isActive = u.active !== false;
-          const roleLabel = ROLE_LABELS[u.role] || u.role;
+          let role = u.role;
+          if (u.job_role?.name) {
+            const jrn = u.job_role.name.toLowerCase();
+            if (jrn.includes('financ')) role = 'financeiro';
+            else if (jrn.includes('admin')) role = 'admin';
+            else if (jrn.includes('aprov')) role = 'aprovador';
+          }
+          const roleLabel = ROLE_LABELS[role] || role;
           const deptName = getDeptName(u);
 
           let roleBadgeStyle = 'background:#e0e7ff;color:#3730a3;'; // indigo default
-          if (u.role === 'admin') roleBadgeStyle = 'background:#fef3c7;color:#92400e;'; // amber
-          else if (u.role === 'aprovador') roleBadgeStyle = 'background:#dbeafe;color:#1e40af;'; // blue
-          else if (u.role === 'financeiro') roleBadgeStyle = 'background:#f3e8ff;color:#6b21a8;'; // purple
-          else if (u.role === 'usuario') roleBadgeStyle = 'background:#f1f5f9;color:#334155;'; // slate
+          if (role === 'admin') roleBadgeStyle = 'background:#fef3c7;color:#92400e;'; // amber
+          else if (role === 'aprovador') roleBadgeStyle = 'background:#dbeafe;color:#1e40af;'; // blue
+          else if (role === 'financeiro') roleBadgeStyle = 'background:#f3e8ff;color:#6b21a8;'; // purple
+          else if (role === 'usuario') roleBadgeStyle = 'background:#f1f5f9;color:#334155;'; // slate
 
           return `
             <tr>
@@ -598,6 +612,13 @@ const AdminPage = {
 
       if (!res || !res.access_token || !res.user) {
         throw new Error('Resposta inválida do servidor ao iniciar simulação.');
+      }
+
+      if (res.user.job_role?.name) {
+        const jrn = res.user.job_role.name.toLowerCase();
+        if (jrn.includes('financ')) res.user.role = 'financeiro';
+        else if (jrn.includes('admin')) res.user.role = 'admin';
+        else if (jrn.includes('aprov')) res.user.role = 'aprovador';
       }
 
       Api.setToken(res.access_token);

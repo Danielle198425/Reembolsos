@@ -85,6 +85,12 @@ def run_auto_migrations():
     # Migrações adicionais de tipo e constraints no Postgres
     if not IS_SQLITE:
         try:
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                conn.execute(text("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'financeiro';"))
+        except Exception as e:
+            print(f"[migration] alter type userrole: {e}")
+
+        try:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE users ALTER COLUMN payment_method TYPE VARCHAR(50);"))
         except Exception as e:
@@ -102,6 +108,58 @@ def run_auto_migrations():
                 """))
         except Exception as e:
             print(f"[migration] expenses_export_id_fkey ON DELETE SET NULL: {e}")
+
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    UPDATE users
+                    SET role = 'financeiro'
+                    WHERE job_role_id IN (
+                        SELECT id FROM job_roles WHERE LOWER(name) LIKE '%financ%'
+                    ) AND role::text != 'financeiro';
+                """))
+                conn.execute(text("""
+                    UPDATE users
+                    SET role = 'admin'
+                    WHERE job_role_id IN (
+                        SELECT id FROM job_roles WHERE LOWER(name) LIKE '%admin%'
+                    ) AND role::text != 'admin';
+                """))
+                conn.execute(text("""
+                    UPDATE users
+                    SET role = 'aprovador'
+                    WHERE job_role_id IN (
+                        SELECT id FROM job_roles WHERE LOWER(name) LIKE '%aprov%'
+                    ) AND role::text != 'aprovador';
+                """))
+        except Exception as e:
+            print(f"[migration] sync user roles postgres: {e}")
+    else:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    UPDATE users
+                    SET role = 'financeiro'
+                    WHERE job_role_id IN (
+                        SELECT id FROM job_roles WHERE LOWER(name) LIKE '%financ%'
+                    ) AND role != 'financeiro';
+                """))
+                conn.execute(text("""
+                    UPDATE users
+                    SET role = 'admin'
+                    WHERE job_role_id IN (
+                        SELECT id FROM job_roles WHERE LOWER(name) LIKE '%admin%'
+                    ) AND role != 'admin';
+                """))
+                conn.execute(text("""
+                    UPDATE users
+                    SET role = 'aprovador'
+                    WHERE job_role_id IN (
+                        SELECT id FROM job_roles WHERE LOWER(name) LIKE '%aprov%'
+                    ) AND role != 'aprovador';
+                """))
+        except Exception as e:
+            print(f"[migration] sync user roles sqlite: {e}")
 
 
 

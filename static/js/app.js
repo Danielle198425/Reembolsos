@@ -297,6 +297,16 @@ function showLogin() {
 }
 
 function showApp(user) {
+  if (user && user.job_role && user.job_role.name) {
+    const jrName = user.job_role.name.toLowerCase();
+    if (jrName.includes('financ') && user.role !== 'financeiro') {
+      user.role = 'financeiro';
+    } else if (jrName.includes('admin') && user.role !== 'admin') {
+      user.role = 'admin';
+    } else if (jrName.includes('aprov') && user.role !== 'aprovador') {
+      user.role = 'aprovador';
+    }
+  }
   App.user = user;
   if (window.ExpensesPage) {
     ExpensesPage.costCenters = [];

@@ -74,6 +74,21 @@ def get_current_user(
     if user is None:
         raise credentials_exception
 
+    if getattr(user, 'job_role', None):
+        jr_name = (user.job_role.name or "").lower()
+        if "financ" in jr_name and user.role != models.UserRole.financeiro:
+            user.role = models.UserRole.financeiro
+            try: db.commit()
+            except: db.rollback()
+        elif "admin" in jr_name and user.role != models.UserRole.admin:
+            user.role = models.UserRole.admin
+            try: db.commit()
+            except: db.rollback()
+        elif "aprov" in jr_name and user.role != models.UserRole.aprovador:
+            user.role = models.UserRole.aprovador
+            try: db.commit()
+            except: db.rollback()
+
     user._impersonator_id = payload.get("impersonator_id")
     user._impersonator_name = payload.get("impersonator_name")
     return user
