@@ -160,7 +160,7 @@ def _expense_out(e: models.Expense) -> dict:
         "finalizer_name": e.finalizer.name if getattr(e, 'finalizer', None) else None,
         "paid_by": getattr(e, 'paid_by', None),
         "paid_at": (e.paid_at.isoformat() + "Z") if getattr(e, 'paid_at', None) else None,
-        "payer_name": e.payer.name if getattr(e, 'payer', None) else None,
+        "payer_name": (e.payer.name if getattr(e, 'payer', None) else ("Sienge (Integração Contas a Pagar)" if (hasattr(e, 'status') and (e.status == models.ExpenseStatus.pago or getattr(e.status, 'value', None) == 'pago')) else None)),
         "export_id": getattr(e, 'export_id', None),
         "email_sent": bool(getattr(e, 'email_sent', False)),
         "sienge_title": getattr(e, 'sienge_title', None),
@@ -403,6 +403,16 @@ def get_expense(
         raise HTTPException(404, "Despesa não encontrada")
     if not _can_view(expense, current_user):
         raise HTTPException(403, "Acesso negado")
+
+    # Se estiver com status 'enviado' ou tiver título Sienge pendente de baixa,
+    # consulta a situação da parcela no Sienge e atualiza para 'pago' se for PG
+    if expense.status == models.ExpenseStatus.enviado or (expense.sienge_title and expense.status != models.ExpenseStatus.pago):
+        try:
+            from services.sienge_service import sync_expense_sienge_payment
+            sync_expense_sienge_payment(expense, db, current_user=current_user)
+        except Exception as exc:
+            logger.warning(f"Erro ao verificar pagamento Sienge no get_expense: {exc}")
+
     return _expense_out(expense)
 
 
@@ -1314,6 +1324,37 @@ def pay_expense_sienge(
         "message": "Baixa de pagamento registrada com sucesso!",
         "expense": _expense_out(exp)
     }
+
+
+@router.post("/{expense_id}/check-sienge-payment")
+def check_expense_sienge_payment(
+    expense_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(404, "Despesa não encontrada.")
+    if not _can_view(expense, current_user):
+        raise HTTPException(403, "Acesso negado.")
+
+    from services.sienge_service import sync_expense_sienge_payment
+    result = sync_expense_sienge_payment(expense, db, current_user=current_user)
+    result["expense"] = _expense_out(expense)
+    return result
+
+
+@router.post("/sync-sienge-payments")
+def sync_all_sienge_payments_route(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role not in [models.UserRole.admin, models.UserRole.financeiro]:
+        raise HTTPException(403, "Apenas administradores e financeiro podem sincronizar pagamentos com o Sienge.")
+
+    from services.sienge_service import sync_all_pending_sienge_payments
+    return sync_all_pending_sienge_payments(db, current_user=current_user)
+
 
 
 

@@ -208,6 +208,7 @@ const ExpensesPage = {
             <span class="table-total" id="exp-total" style="font-size:13px;color:var(--text-3);font-weight:500;"></span>
           </div>
           <div class="table-actions" style="display:flex;align-items:center;gap:8px;">
+            ${isAdminOrFinance ? `<button class="btn btn-sm btn-secondary" id="btn-sync-sienge-payments" title="Consultar parcelas no Sienge e atualizar para 'pago' se quitadas (PG)">🔄 Sincronizar Sienge</button>` : ''}
             ${isAdminOrFinance ? `<button class="btn btn-sm btn-primary" id="btn-bulk-sienge">Gerar Título</button>` : ''}
             <button class="btn btn-sm btn-ghost" id="reload-expenses-btn" title="Recarregar">↻</button>
           </div>
@@ -322,6 +323,27 @@ const ExpensesPage = {
     document.getElementById('reload-expenses-btn').addEventListener('click', () => this.loadExpenses());
     document.getElementById('btn-exec-report')?.addEventListener('click', () => this.exportSelected());
     document.getElementById('btn-bulk-sienge')?.addEventListener('click', () => this.bulkSendSienge());
+    document.getElementById('btn-sync-sienge-payments')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-sync-sienge-payments');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Sincronizando...';
+      try {
+        const res = await Api.syncSiengePayments();
+        if (res.total_updated > 0) {
+          toast(res.message || `${res.total_updated} despesa(s) atualizada(s) para 'pago'!`, 'success');
+        } else {
+          toast(res.message || 'Todas as despesas no Sienge já estão sincronizadas.', 'info');
+        }
+        this.loadExpenses();
+        DashboardPage.render && DashboardPage.render();
+      } catch (err) {
+        toast('Erro ao sincronizar com o Sienge: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    });
 
 
     document.querySelectorAll('#expense-tabs .tab').forEach(tab => {
@@ -848,6 +870,9 @@ const ExpensesPage = {
               <button class="action-btn success" title="Aprovar" data-action="approve" data-id="${e.id}">✔</button>
               <button class="action-btn danger" title="Rejeitar" data-action="reject" data-id="${e.id}">✘</button>
             ` : ''}
+            ${(isAdminOrFinance && (e.status === 'enviado' || (e.sienge_title && e.status !== 'pago'))) ? `
+              <button class="action-btn" title="Consultar quitação no Sienge (PG)" data-action="check-sienge" data-id="${e.id}" style="color:var(--ml-indigo);">🔄</button>
+            ` : ''}
             ${canFinalize ? `<button class="action-btn" title="Finalizar despesa" data-action="finalize" data-id="${e.id}" style="color:var(--purple);">🏁</button>` : ''}
             ${canResubmit ? `<button class="action-btn" title="Reenviar" data-action="resubmit" data-id="${e.id}" style="color:var(--amber);">↩</button>` : ''}
             ${canEdit ? `<button class="action-btn" title="Editar despesa" data-action="edit" data-id="${e.id}"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ml-indigo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>` : ''}
@@ -906,6 +931,20 @@ const ExpensesPage = {
           toast(err.message, 'error');
         }
       }),
+      'check-sienge': async () => {
+        try {
+          const res = await Api.checkSiengePayment(id);
+          if (res.updated) {
+            toast(res.message || 'Parcela quitada no Sienge (PG)! Despesa atualizada para Pago.', 'success');
+          } else {
+            toast(res.message || `Situação da parcela no Sienge: ${res.situation || 'Pendente'}`, 'info');
+          }
+          this.loadExpenses();
+          DashboardPage.render && DashboardPage.render();
+        } catch (err) {
+          toast('Erro ao consultar Sienge: ' + err.message, 'error');
+        }
+      },
       'pay-sienge': () => Modal.confirm('Baixa de Pagamento', 'Confirma a baixa do pagamento para esta despesa?', async () => {
         try {
           const res = await Api.payExpenseSienge(id);
@@ -1012,13 +1051,23 @@ const ExpensesPage = {
       const currentIdx = flowStatuses.indexOf(normStatus);
 
 
-      const flowHTML = flowStatuses.map((s, i) => `
-        <div class="flow-step">
-          <div class="flow-dot ${i < currentIdx ? 'done' : i === currentIdx ? (e.status === 'rejeitado' ? 'rejected' : 'current') : ''}"></div>
-          <span class="flow-step-label">${STATUS_LABELS[s] || s}</span>
-        </div>
-        ${i < flowStatuses.length - 1 ? `<div class="flow-line ${i < currentIdx ? 'done' : ''}"></div>` : ''}
-      `).join('');
+      const flowHTML = flowStatuses.map((s, i) => {
+        let dotClass = '';
+        if (i < currentIdx) {
+          dotClass = 'done';
+        } else if (i === currentIdx) {
+          if (e.status === 'rejeitado') dotClass = 'rejected';
+          else if (s === 'pago') dotClass = 'done';
+          else dotClass = 'current';
+        }
+        return `
+          <div class="flow-step">
+            <div class="flow-dot ${dotClass}"></div>
+            <span class="flow-step-label ${i <= currentIdx ? 'active' : ''}">${STATUS_LABELS[s] || s}</span>
+          </div>
+          ${i < flowStatuses.length - 1 ? `<div class="flow-line ${i < currentIdx ? 'done' : ''}"></div>` : ''}
+        `;
+      }).join('');
 
 
       const viewStatusTooltip = (e.status === 'finalizado' && !e.sienge_title) ? 'Pendente criar título no Sienge' : (e.sienge_title ? `Título Sienge ${e.sienge_title}` : '');
@@ -1178,10 +1227,45 @@ const ExpensesPage = {
       `;
 
 
+      const canCheckSienge = (e.status === 'enviado' || (e.sienge_title && e.status !== 'pago'));
+      const footerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;width:100%;gap:10px;flex-wrap:wrap;">
+          <div>
+            ${canCheckSienge ? `<button type="button" class="btn btn-secondary btn-sm" id="check-sienge-btn-${id}">🔄 Consultar Situação no Sienge</button>` : ''}
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="Modal.close()">Fechar</button>
+        </div>
+      `;
+
       Modal.open(`Despesa #${String(id).padStart(6,'0')}`, html,
-        `<button class="btn btn-primary btn-sm" onclick="Modal.close()">Fechar</button>`,
+        footerHTML,
         { size: 'lg' }
       );
+
+      const checkSiengeBtn = document.getElementById(`check-sienge-btn-${id}`);
+      if (checkSiengeBtn) {
+        checkSiengeBtn.addEventListener('click', async () => {
+          checkSiengeBtn.disabled = true;
+          checkSiengeBtn.innerHTML = '⏳ Consultando...';
+          try {
+            const res = await Api.checkSiengePayment(id);
+            if (res.updated) {
+              toast(res.message || 'Parcela quitada no Sienge (PG)! Despesa atualizada para Pago.', 'success');
+              this.loadExpenses();
+              DashboardPage.render && DashboardPage.render();
+              this.viewExpense(id);
+            } else {
+              toast(res.message || `Situação da parcela no Sienge: ${res.situation || 'Pendente'}`, 'info');
+              checkSiengeBtn.disabled = false;
+              checkSiengeBtn.innerHTML = '🔄 Consultar Situação no Sienge';
+            }
+          } catch (err) {
+            toast('Erro ao consultar Sienge: ' + err.message, 'error');
+            checkSiengeBtn.disabled = false;
+            checkSiengeBtn.innerHTML = '🔄 Consultar Situação no Sienge';
+          }
+        });
+      }
 
 
       // Bind upload button if present

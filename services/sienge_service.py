@@ -631,3 +631,207 @@ def process_sienge_bill_for_user_expenses(
         "due_date": due_date_str,
         "due_date_formatted": due_date_formatted,
     }
+
+
+def is_situation_paid(situation: Optional[str]) -> bool:
+    """
+    Verifica se a situação da parcela no Sienge indica que foi paga.
+    No Sienge:
+      - PG: Paga / Totalmente paga (quitação total)
+      - PC: Parcialmente paga
+      - NP: Não paga
+    Aceita variações 'PG', 'Totalmente paga', 'Paga', 'Pago', 'Liquidada', 'Baixada'.
+    """
+    if not situation:
+        return False
+    s = str(situation).strip().upper()
+    return s in ("PG", "TOTALMENTE PAGA", "PAGA", "PAGO", "LIQUIDADA", "BAIXADA")
+
+
+def get_bill_installments_info(
+    bill_id: str,
+    creditor_id: Optional[int] = None,
+    doc_number: Optional[str] = None
+) -> Tuple[str, List[dict]]:
+    """
+    Consulta as parcelas de um título no Sienge via GET /bills/{bill_id}/installments.
+    Caso o endpoint retorne 404 e haja credor informado, realiza uma busca de contingência
+    nos títulos recentes do credor para localizar o título correspondente.
+    """
+    url = f"{BASE_URL}/bills/{bill_id}/installments"
+    try:
+        resp = requests.get(url, headers=get_headers(), timeout=15)
+        if resp.status_code == 200:
+            data = resp.json()
+            results = data.get("results", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+            return str(bill_id), results
+    except Exception as exc:
+        logger.warning(f"Erro ao consultar parcelas do título {bill_id} no Sienge: {exc}")
+
+    # Fallback: busca por credor e documento se o título retornar 404
+    if creditor_id:
+        today = datetime.now()
+        start_date = f"{today.year}-{today.month:02d}-01"
+        search_url = f"{BASE_URL}/bills?startDate={start_date}&endDate={today.strftime('%Y-%m-%d')}&creditorId={creditor_id}"
+        try:
+            s_resp = requests.get(search_url, headers=get_headers(), timeout=15)
+            if s_resp.status_code == 200:
+                s_data = s_resp.json()
+                bills = s_data.get("results", []) if isinstance(s_data, dict) else s_data
+                for b in bills:
+                    b_doc = (b.get("documentNumber") or "").strip()
+                    if (doc_number and b_doc == doc_number.strip()) or (not doc_number):
+                        new_id = str(b.get("id"))
+                        i_resp = requests.get(f"{BASE_URL}/bills/{new_id}/installments", headers=get_headers(), timeout=15)
+                        if i_resp.status_code == 200:
+                            i_data = i_resp.json()
+                            results = i_data.get("results", []) if isinstance(i_data, dict) else (i_data if isinstance(i_data, list) else [])
+                            return new_id, results
+        except Exception as exc:
+            logger.warning(f"Erro no fallback de consulta de títulos por credor: {exc}")
+
+    return str(bill_id), []
+
+
+def sync_expense_sienge_payment(
+    expense: models.Expense,
+    db: Session,
+    current_user: Optional[models.User] = None
+) -> dict:
+    """
+    Verifica a situação da parcela no Sienge (API de parcelas do contas a pagar).
+    Se estiver 'PG' (Totalmente paga), atualiza o status da despesa para 'pago'
+    e reflete no fluxo de aprovação.
+    """
+    # Determinar título Sienge a consultar
+    bill_id = expense.sienge_title
+    creditor_id = None
+    if expense.user and expense.user.creditor_code:
+        try:
+            creditor_id = int(str(expense.user.creditor_code).strip())
+        except Exception:
+            pass
+
+    doc_number = None
+    if expense.expense_date:
+        doc_number = f"Reembolso {expense.expense_date.month:02d}.{expense.expense_date.year}"
+
+    if not bill_id and not creditor_id:
+        return {
+            "success": False,
+            "updated": False,
+            "message": "Despesa não possui título Sienge nem credor vinculado para verificação.",
+            "status": expense.status.value if hasattr(expense.status, 'value') else expense.status
+        }
+
+    effective_bill_id, installments = get_bill_installments_info(
+        bill_id or "0",
+        creditor_id=creditor_id,
+        doc_number=doc_number
+    )
+
+    if not installments:
+        return {
+            "success": True,
+            "updated": False,
+            "message": f"Nenhuma parcela encontrada para o título Sienge nº {effective_bill_id or bill_id}.",
+            "bill_id": effective_bill_id,
+            "status": expense.status.value if hasattr(expense.status, 'value') else expense.status
+        }
+
+    # Atualizar título na despesa se foi recuperado via fallback
+    if effective_bill_id and effective_bill_id != expense.sienge_title and effective_bill_id != "0":
+        expense.sienge_title = effective_bill_id
+
+    # Analisar situações das parcelas
+    situations = [inst.get("situation") for inst in installments if inst.get("situation")]
+    primary_situation = situations[0] if situations else "Não identificada"
+    is_paid = all(is_situation_paid(inst.get("situation")) for inst in installments)
+
+    if is_paid:
+        previous_status = expense.status.value if hasattr(expense.status, 'value') else expense.status
+        now = datetime.utcnow()
+        expense.status = models.ExpenseStatus.pago
+        if not expense.paid_at:
+            expense.paid_at = now
+        if current_user and not expense.paid_by:
+            expense.paid_by = current_user.id
+            if current_user.role == models.UserRole.admin:
+                expense.paid_by_admin_id = current_user.id
+                expense.paid_by_admin_name = current_user.name
+
+        # Registro em log de auditoria
+        audit = models.AuditLog(
+            action="SIENGE_PAYMENT_SYNC",
+            target_email=expense.user.email if expense.user else None,
+            admin_id=current_user.id if current_user else None,
+            admin_name=current_user.name if current_user else "Sistema (Sienge API)",
+            status="sucesso",
+            details=f"Despesa #{expense.id} atualizada para PAGO após confirmação da parcela do título Sienge nº {effective_bill_id} (Situação: {primary_situation} - PG)."
+        )
+        db.add(audit)
+        db.commit()
+        db.refresh(expense)
+
+        return {
+            "success": True,
+            "updated": True,
+            "previous_status": previous_status,
+            "new_status": "pago",
+            "situation": primary_situation,
+            "bill_id": effective_bill_id,
+            "installments_count": len(installments),
+            "message": f"Parcela quitada no Sienge ({primary_situation} - PG). Status atualizado para 'pago'."
+        }
+
+    return {
+        "success": True,
+        "updated": False,
+        "situation": primary_situation,
+        "bill_id": effective_bill_id,
+        "installments_count": len(installments),
+        "status": expense.status.value if hasattr(expense.status, 'value') else expense.status,
+        "message": f"Situação da parcela no Sienge: {primary_situation}. Pagamento pendente de quitação total (PG)."
+    }
+
+
+def sync_all_pending_sienge_payments(
+    db: Session,
+    current_user: Optional[models.User] = None
+) -> dict:
+    """
+    Varre todas as despesas no status 'enviado' (ou finalizadas com título Sienge)
+    e sincroniza a situação de pagamento com o Sienge.
+    """
+    candidates = db.query(models.Expense).filter(
+        (models.Expense.status == models.ExpenseStatus.enviado) |
+        ((models.Expense.sienge_title != None) & (models.Expense.status != models.ExpenseStatus.pago))
+    ).all()
+
+    total_checked = 0
+    total_updated = 0
+    updated_expenses = []
+
+    for exp in candidates:
+        total_checked += 1
+        try:
+            res = sync_expense_sienge_payment(exp, db, current_user=current_user)
+            if res.get("updated"):
+                total_updated += 1
+                updated_expenses.append({
+                    "id": exp.id,
+                    "user_name": exp.user.name if exp.user else "-",
+                    "amount": exp.amount,
+                    "bill_id": res.get("bill_id"),
+                    "situation": res.get("situation")
+                })
+        except Exception as exc:
+            logger.warning(f"Erro ao sincronizar despesa #{exp.id} com Sienge: {exc}")
+
+    return {
+        "total_checked": total_checked,
+        "total_updated": total_updated,
+        "updated_expenses": updated_expenses,
+        "message": f"{total_updated} de {total_checked} despesa(s) atualizada(s) para 'pago' com base no Sienge."
+    }
+

@@ -583,7 +583,7 @@ img { max-width: 100%; }
   border: 1px solid #FDE68A;
 }
 .badge-enviado       { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
-.badge-pago          { background: var(--ml-light); color: var(--ml-indigo); }
+.badge-pago          { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
 
 /* ── Stat Cards ──────────────────────────────────────────────────────────── */
 .stats-grid {
@@ -1265,6 +1265,7 @@ tbody td {
 .flow-dot.current { background: var(--ml-indigo); box-shadow: 0 0 0 3px rgba(79,70,229,.25); }
 .flow-dot.rejected { background: var(--red); }
 .flow-step-label { font-size: 10px; color: var(--text-4); text-align: center; max-width: 70px; line-height: 1.2; }
+.flow-step-label.active { color: var(--text-1); font-weight: 600; }
 .flow-line { flex: 1; height: 2px; background: var(--border); min-width: 20px; }
 .flow-line.done { background: var(--green); }
 

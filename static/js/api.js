@@ -108,6 +108,8 @@ const Api = {
   sendExpenseToSienge(id) { return Api.post(`/api/expenses/${id}/send-sienge`); },
   bulkSendExpensesToSienge(ids) { return Api.post(`/api/expenses/bulk-send-sienge`, { expense_ids: ids }); },
   payExpenseSienge(id) { return Api.post(`/api/expenses/${id}/pay-sienge`); },
+  checkSiengePayment(id) { return Api.post(`/api/expenses/${id}/check-sienge-payment`); },
+  syncSiengePayments() { return Api.post(`/api/expenses/sync-sienge-payments`); },
   getPaymentCalendar() { return Api.get('/api/admin/payment-calendar'); },
   savePaymentCalendar(data) { return Api.post('/api/admin/payment-calendar', data); },
   uploadReceipt(id, file) {
