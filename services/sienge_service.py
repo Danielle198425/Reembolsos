@@ -804,11 +804,9 @@ def sync_expense_sienge_payment(
         expense.status = models.ExpenseStatus.pago
         if not expense.paid_at:
             expense.paid_at = now
-        if current_user and not expense.paid_by:
-            expense.paid_by = current_user.id
-            if current_user.role == models.UserRole.admin:
-                expense.paid_by_admin_id = current_user.id
-                expense.paid_by_admin_name = current_user.name
+        expense.paid_by = None
+        expense.paid_by_admin_id = None
+        expense.paid_by_admin_name = None
 
         if previous_status != "pago":
             audit = models.AuditLog(

@@ -404,18 +404,6 @@ def get_expense(
     if not _can_view(expense, current_user):
         raise HTTPException(403, "Acesso negado")
 
-    # Se estiver com status 'enviado', 'pago' ou com título Sienge vinculado,
-    # sincroniza em tempo real com o Sienge:
-    # - Se o título foi excluído no Sienge -> retorna para 'finalizado' e limpa sienge_title
-    # - Se a baixa foi excluída no Sienge -> retorna para 'enviado' e mantém o número do título
-    # - Se a parcela estiver quitada (PG) -> atualiza para 'pago'
-    if expense.status in [models.ExpenseStatus.enviado, models.ExpenseStatus.pago] or expense.sienge_title:
-        try:
-            from services.sienge_service import sync_expense_sienge_payment
-            sync_expense_sienge_payment(expense, db, current_user=current_user)
-        except Exception as exc:
-            logger.warning(f"Erro ao verificar pagamento Sienge no get_expense: {exc}")
-
     return _expense_out(expense)
 
 

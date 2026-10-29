@@ -11,6 +11,11 @@ if DATABASE_URL.startswith("postgres://"):
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
+# Se estiver usando o pooler da Supabase na porta 5432 (session mode limitado a 15 clientes),
+# direcionar para a porta 6543 (transaction mode pooler) para suportar serverless na Vercel
+if "pooler.supabase.com:5432" in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("pooler.supabase.com:5432", "pooler.supabase.com:6543")
+
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 if IS_SQLITE:
@@ -19,11 +24,12 @@ if IS_SQLITE:
         connect_args={"check_same_thread": False}
     )
 else:
+    from sqlalchemy.pool import NullPool
     engine = create_engine(
         DATABASE_URL,
+        poolclass=NullPool,
         pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=5,
+        connect_args={"connect_timeout": 10}
     )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

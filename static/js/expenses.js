@@ -871,9 +871,6 @@ const ExpensesPage = {
               <button class="action-btn success" title="Aprovar" data-action="approve" data-id="${e.id}">✔</button>
               <button class="action-btn danger" title="Rejeitar" data-action="reject" data-id="${e.id}">✘</button>
             ` : ''}
-            ${(isAdminOrFinance && (e.status === 'enviado' || e.status === 'pago' || e.sienge_title)) ? `
-              <button class="action-btn" title="Consultar quitação no Sienge (PG)" data-action="check-sienge" data-id="${e.id}" style="color:var(--ml-indigo);">🔄</button>
-            ` : ''}
             ${canFinalize ? `<button class="action-btn" title="Finalizar despesa" data-action="finalize" data-id="${e.id}" style="color:var(--purple);">🏁</button>` : ''}
             ${canResubmit ? `<button class="action-btn" title="Reenviar" data-action="resubmit" data-id="${e.id}" style="color:var(--amber);">↩</button>` : ''}
             ${canEdit ? `<button class="action-btn" title="Editar despesa" data-action="edit" data-id="${e.id}"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ml-indigo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>` : ''}
@@ -1112,7 +1109,7 @@ const ExpensesPage = {
           </div>` : ''}
 
 
-          ${(e.created_by_admin_name || e.approved_by_admin_name || e.rejected_by_admin_name || e.finalized_by_admin_name || e.paid_by_admin_name) ? `
+          ${(e.created_by_admin_name || e.approved_by_admin_name || e.rejected_by_admin_name || e.finalized_by_admin_name ) ? `
           <div class="detail-section" style="border-left:4px solid #6366f1;background:rgba(99,102,241,0.08);padding:14px 16px;border-radius:8px;margin-bottom:16px;">
             <div style="font-weight:700;color:#4338ca;font-size:14px;margin-bottom:8px;">
               Ações Realizadas no Modo "Ver Como"
@@ -1122,7 +1119,6 @@ const ExpensesPage = {
               ${e.approved_by_admin_name ? `<li><strong>Aprovação:</strong> realizada pelo administrador <strong>${escHtml(e.approved_by_admin_name)}</strong></li>` : ''}
               ${e.rejected_by_admin_name ? `<li><strong>Reprovação:</strong> realizada pelo administrador <strong>${escHtml(e.rejected_by_admin_name)}</strong></li>` : ''}
               ${e.finalized_by_admin_name ? `<li><strong>Finalização:</strong> realizada pelo administrador <strong>${escHtml(e.finalized_by_admin_name)}</strong></li>` : ''}
-              ${e.paid_by_admin_name ? `<li><strong>Baixa de Pagamento:</strong> realizada pelo administrador <strong>${escHtml(e.paid_by_admin_name)}</strong></li>` : ''}
             </ul>
             <div style="font-size:11.5px;color:var(--text-3);margin-top:6px;">
               Registrado para fins de auditoria, transparência e controle administrativo.
@@ -1201,16 +1197,10 @@ const ExpensesPage = {
           </div>` : ''}
 
 
-          ${(e.payer_name || e.paid_at || e.status === 'pago') ? `
-          <div class="detail-section" style="border-left:3px solid #3b82f6;">
-            <h4 style="text-transform:uppercase;color:#3b82f6;font-size:12px;letter-spacing:0.5px;">Pagamento</h4>
-            <div class="detail-row"><span class="detail-key">Pago por</span><span class="detail-value">${escHtml(e.payer_name || 'Financeiro')}</span></div>
+          ${(e.paid_at || e.status === 'pago') ? `
+          <div class="detail-section" style="border-left:3px solid #16a34a;background:rgba(22,163,74,0.04);padding:14px 16px;border-radius:8px;">
+            <h4 style="text-transform:uppercase;color:#16a34a;font-size:12px;letter-spacing:0.5px;">Pagamento</h4>
             <div class="detail-row"><span class="detail-key">Data do Pagamento</span><span class="detail-value">${fmtDateTime(e.paid_at || e.updated_at)}</span></div>
-            ${(e.paid_by_admin_name || e.paid_by_admin_id) ? `
-            <div class="detail-row" style="background:#f0fdf4;padding:6px 10px;border-radius:6px;margin-top:6px;">
-              <span class="detail-key" style="color:#15803d;font-weight:700;">Pago por (Ver como)</span>
-              <span class="detail-value" style="color:#15803d;font-weight:700;">Administrador: ${escHtml(e.paid_by_admin_name || 'Administrador')}</span>
-            </div>` : ''}
           </div>` : ''}
 
 
