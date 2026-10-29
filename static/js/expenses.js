@@ -797,7 +797,8 @@ const ExpensesPage = {
       statusTooltip = e.sienge_title ? `Título Sienge ${e.sienge_title}` : 'Enviado para o Sienge';
     } else if (e.status === 'pago') {
       const pDate = e.paid_at ? fmtDate(e.paid_at) : (e.updated_at ? fmtDate(e.updated_at) : '');
-      statusTooltip = pDate ? `Pagamento realizado em ${pDate}` : 'Pagamento realizado';
+      const tInfo = e.sienge_title ? ` (Título Sienge ${e.sienge_title})` : '';
+      statusTooltip = pDate ? `Pagamento realizado em ${pDate}${tInfo}` : `Pagamento realizado${tInfo}`;
     }
 
     const receipt = e.receipt_path
@@ -870,7 +871,7 @@ const ExpensesPage = {
               <button class="action-btn success" title="Aprovar" data-action="approve" data-id="${e.id}">✔</button>
               <button class="action-btn danger" title="Rejeitar" data-action="reject" data-id="${e.id}">✘</button>
             ` : ''}
-            ${(isAdminOrFinance && (e.status === 'enviado' || (e.sienge_title && e.status !== 'pago'))) ? `
+            ${(isAdminOrFinance && (e.status === 'enviado' || e.status === 'pago' || e.sienge_title)) ? `
               <button class="action-btn" title="Consultar quitação no Sienge (PG)" data-action="check-sienge" data-id="${e.id}" style="color:var(--ml-indigo);">🔄</button>
             ` : ''}
             ${canFinalize ? `<button class="action-btn" title="Finalizar despesa" data-action="finalize" data-id="${e.id}" style="color:var(--purple);">🏁</button>` : ''}
@@ -1227,7 +1228,7 @@ const ExpensesPage = {
       `;
 
 
-      const canCheckSienge = (e.status === 'enviado' || (e.sienge_title && e.status !== 'pago'));
+      const canCheckSienge = (e.status === 'enviado' || e.status === 'pago' || e.sienge_title);
       const footerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;width:100%;gap:10px;flex-wrap:wrap;">
           <div>
