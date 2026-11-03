@@ -144,7 +144,14 @@ const Api = {
   updateUser(id, data) { return Api.put(`/api/admin/users/${id}`, data); },
   deleteUser(id) { return Api.delete(`/api/admin/users/${id}`); },
   sendPasswordEmail(email) { return Api.post('/api/admin/users/send-password-email', { email }); },
-  getAuditLogs() { return Api.get('/api/admin/audit-logs'); },
+  getAuditLogs(params = {}) {
+    const q = new URLSearchParams();
+    if (params.month) q.set('month', params.month);
+    if (params.page) q.set('page', params.page);
+    if (params.per_page) q.set('per_page', params.per_page);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return Api.get(`/api/admin/audit-logs${qs}`);
+  },
   getLockedUsers() { return Api.get('/api/admin/users/locked'); },
   unlockUser(id) { return Api.post(`/api/admin/users/${id}/unlock`); },
   impersonateUser(id) { return Api.post(`/api/admin/users/${id}/impersonate`); },

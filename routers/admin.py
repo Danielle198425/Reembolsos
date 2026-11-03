@@ -1,6 +1,8 @@
 import os
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Body, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Body, File, UploadFile, Query
+import math
+from sqlalchemy import extract
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database import get_db, IS_SQLITE
@@ -368,6 +370,9 @@ def delete_user(
         db.query(models.Expense).filter(models.Expense.user_id == uid).delete(synchronize_session=False)
 
         # 6. Excluir o usuário
+        user.cost_center_id = None
+        user.job_role_id = None
+        user.job_function_id = None
         db.delete(user)
         db.commit()
     except Exception as e:
@@ -467,22 +472,48 @@ def send_password_email(
 # ─── AUDIT LOGS ──────────────────────────────────────────────────────────────
 @router.get("/audit-logs")
 def list_audit_logs(
+    month: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
     current_user: models.User = Depends(auth.require_admin),
     db: Session = Depends(get_db)
 ):
-    logs = db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).limit(500).all()
-    return [
-        {
-            "id": l.id,
-            "action": l.action,
-            "target_email": l.target_email,
-            "admin_name": l.admin_name,
-            "status": l.status,
-            "details": l.details,
-            "timestamp": l.timestamp.isoformat() if l.timestamp else None,
-        }
-        for l in logs
-    ]
+    query = db.query(models.AuditLog)
+
+    if month and month.strip():
+        parts = month.strip().split("-")
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            y_val, m_val = int(parts[0]), int(parts[1])
+            query = query.filter(
+                extract('year', models.AuditLog.timestamp) == y_val,
+                extract('month', models.AuditLog.timestamp) == m_val
+            )
+
+    total = query.count()
+    total_pages = max(1, math.ceil(total / per_page)) if total > 0 else 1
+    current_page = min(page, total_pages) if page > 1 else 1
+    offset = (current_page - 1) * per_page
+
+    logs = query.order_by(models.AuditLog.timestamp.desc()).offset(offset).limit(per_page).all()
+
+    return {
+        "items": [
+            {
+                "id": l.id,
+                "action": l.action,
+                "target_email": l.target_email,
+                "admin_name": l.admin_name,
+                "status": l.status,
+                "details": l.details,
+                "timestamp": l.timestamp.isoformat() if l.timestamp else None,
+            }
+            for l in logs
+        ],
+        "total": total,
+        "page": current_page,
+        "per_page": per_page,
+        "total_pages": total_pages
+    }
 
 
 # ─── COST CENTERS ────────────────────────────────────────────────────────────

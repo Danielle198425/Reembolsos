@@ -53,7 +53,7 @@ class User(Base):
     account = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    cost_center = relationship("CostCenter", foreign_keys=[cost_center_id], primaryjoin="User.cost_center_id == foreign(CostCenter.id)", uselist=False)
+    cost_center = relationship("CostCenter", primaryjoin="foreign(User.cost_center_id) == CostCenter.id", uselist=False, viewonly=True)
     job_role = relationship("JobRole", foreign_keys=[job_role_id])
     job_function = relationship("JobFunction", foreign_keys=[job_function_id])
     expenses = relationship("Expense", back_populates="user", foreign_keys="Expense.user_id")

@@ -231,11 +231,48 @@ const AdminPage = {
   },
 
   async renderAuditLogs() {
+    if (!this._auditState) {
+      this._auditState = { page: 1, perPage: 20, month: '' };
+    }
+
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+
+    const now = new Date();
+    let monthOptions = '<option value="">Todos os meses</option>';
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${monthNames[d.getMonth()]}/${d.getFullYear()}`;
+      const selected = this._auditState.month === val ? 'selected' : '';
+      monthOptions += `<option value="${val}" ${selected}>${label}</option>`;
+    }
+
     const el = document.getElementById('admin-section-content');
     el.innerHTML = `
       <div class="table-wrapper">
-        <div class="table-header">
-          <span class="card-title">🛡️ Logs de Auditoria</span>
+        <div class="table-header" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;">
+          <span class="card-title" style="margin:0;">🛡️ Logs de Auditoria</span>
+
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <label for="audit-filter-month" style="font-size:13px;font-weight:600;color:var(--text-2);">Mês:</label>
+              <select id="audit-filter-month" class="form-control" style="width:auto;min-width:170px;font-size:13px;padding:6px 10px;height:36px;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text-1);">
+                ${monthOptions}
+              </select>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:6px;">
+              <label for="audit-per-page" style="font-size:13px;font-weight:600;color:var(--text-2);">Logs por página:</label>
+              <select id="audit-per-page" class="form-control" style="width:auto;font-size:13px;padding:6px 10px;height:36px;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text-1);">
+                <option value="20" ${this._auditState.perPage === 20 ? 'selected' : ''}>20 logs</option>
+                <option value="50" ${this._auditState.perPage === 50 ? 'selected' : ''}>50 logs</option>
+                <option value="100" ${this._auditState.perPage === 100 ? 'selected' : ''}>100 logs</option>
+              </select>
+            </div>
+          </div>
         </div>
         <table>
           <thead>
@@ -251,15 +288,55 @@ const AdminPage = {
             <tr class="loading-row"><td colspan="5">Carregando...</td></tr>
           </tbody>
         </table>
+        <div id="audit-pagination" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;border-top:1px solid var(--border);font-size:13px;background:var(--bg-card);">
+        </div>
       </div>
     `;
 
+    const monthSelect = document.getElementById('audit-filter-month');
+    if (monthSelect) {
+      monthSelect.addEventListener('change', (e) => {
+        this._auditState.month = e.target.value;
+        this._auditState.page = 1;
+        this.fetchAndRenderAuditLogs();
+      });
+    }
+
+    const perPageSelect = document.getElementById('audit-per-page');
+    if (perPageSelect) {
+      perPageSelect.addEventListener('change', (e) => {
+        this._auditState.perPage = parseInt(e.target.value, 10) || 20;
+        this._auditState.page = 1;
+        this.fetchAndRenderAuditLogs();
+      });
+    }
+
+    await this.fetchAndRenderAuditLogs();
+  },
+
+  async fetchAndRenderAuditLogs() {
+    const tbody = document.getElementById('audit-tbody');
+    const paginEl = document.getElementById('audit-pagination');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="5">Carregando...</td></tr>';
+
     try {
-      const logs = await Api.getAuditLogs();
-      const tbody = document.getElementById('audit-tbody');
-      
+      const res = await Api.getAuditLogs({
+        month: this._auditState.month,
+        page: this._auditState.page,
+        per_page: this._auditState.perPage
+      });
+
+      const logs = Array.isArray(res) ? res : (res.items || []);
+      const total = res.total !== undefined ? res.total : logs.length;
+      const totalPages = res.total_pages !== undefined ? res.total_pages : 1;
+      const currentPage = res.page !== undefined ? res.page : this._auditState.page;
+      this._auditState.page = currentPage;
+
       if (!logs || logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-4);">Nenhum log encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-4);padding:24px;">Nenhum log encontrado.</td></tr>';
+        if (paginEl) paginEl.innerHTML = '<span style="color:var(--text-4);">Nenhum registro para exibir.</span>';
         return;
       }
 
@@ -271,22 +348,84 @@ const AdminPage = {
         'RESET_PASSWORD': 'Redefinição de Senha',
         'CREATE_USER': 'Criação de Usuário',
         'UPDATE_USER': 'Edição de Usuário',
-        'DELETE_USER': 'Exclusão de Usuário'
+        'DELETE_USER': 'Exclusão de Usuário',
+        'IMPERSONATE_START': 'Início de "Ver como"',
+        'IMPERSONATE_STOP': 'Fim de "Ver como"'
       };
 
       tbody.innerHTML = logs.map(l => `
         <tr>
           <td style="font-size:13px;color:var(--text-3);">${fmtDateTime(l.timestamp)}</td>
           <td style="font-weight:600;font-size:13px;">${escHtml(actionMap[l.action] || l.action)}</td>
-          <td style="font-size:13px;">${escHtml(l.target_email)}</td>
+          <td style="font-size:13px;">${escHtml(l.target_email || '-')}</td>
           <td style="font-size:13px;color:var(--text-2);">${escHtml(l.admin_name || 'Sistema')}</td>
           <td>
-            <span class="badge ${l.status === 'sucesso' ? 'badge-aprovado' : 'badge-rejeitado'}">${escHtml(l.status.toUpperCase())}</span>
+            <span class="badge ${l.status === 'sucesso' ? 'badge-aprovado' : 'badge-rejeitado'}">${escHtml((l.status || '').toUpperCase())}</span>
           </td>
         </tr>
       `).join('');
+
+      if (paginEl) {
+        let pageOptions = '';
+        for (let p = 1; p <= totalPages; p++) {
+          pageOptions += `<option value="${p}" ${p === currentPage ? 'selected' : ''}>Página ${p}</option>`;
+        }
+
+        const startIdx = total === 0 ? 0 : (currentPage - 1) * this._auditState.perPage + 1;
+        const endIdx = Math.min(currentPage * this._auditState.perPage, total);
+
+        paginEl.innerHTML = `
+          <div style="color:var(--text-3);font-size:13px;">
+            Mostrando <strong>${startIdx}–${endIdx}</strong> de <strong>${total}</strong> logs
+          </div>
+          
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <label for="audit-page-select" style="font-size:13px;font-weight:600;color:var(--text-2);">Escolher página:</label>
+              <select id="audit-page-select" class="form-control" style="width:auto;font-size:13px;padding:4px 8px;height:32px;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text-1);">
+                ${pageOptions}
+              </select>
+              <span style="color:var(--text-3);font-size:13px;">de ${totalPages}</span>
+            </div>
+
+            <div style="display:flex;gap:6px;margin-left:8px;">
+              <button id="audit-btn-prev" class="btn btn-sm btn-outline" style="padding:4px 12px;font-size:12px;height:32px;" ${currentPage <= 1 ? 'disabled' : ''}>
+                ‹ Anterior
+              </button>
+              <button id="audit-btn-next" class="btn btn-sm btn-outline" style="padding:4px 12px;font-size:12px;height:32px;" ${currentPage >= totalPages ? 'disabled' : ''}>
+                Próxima ›
+              </button>
+            </div>
+          </div>
+        `;
+
+        const pageSelect = document.getElementById('audit-page-select');
+        if (pageSelect) {
+          pageSelect.addEventListener('change', (e) => {
+            this._auditState.page = parseInt(e.target.value, 10) || 1;
+            this.fetchAndRenderAuditLogs();
+          });
+        }
+
+        const btnPrev = document.getElementById('audit-btn-prev');
+        if (btnPrev && currentPage > 1) {
+          btnPrev.addEventListener('click', () => {
+            this._auditState.page = currentPage - 1;
+            this.fetchAndRenderAuditLogs();
+          });
+        }
+
+        const btnNext = document.getElementById('audit-btn-next');
+        if (btnNext && currentPage < totalPages) {
+          btnNext.addEventListener('click', () => {
+            this._auditState.page = currentPage + 1;
+            this.fetchAndRenderAuditLogs();
+          });
+        }
+      }
     } catch(err) {
-      document.getElementById('audit-tbody').innerHTML = `<tr><td colspan="5" style="color:var(--red);">Erro: ${escHtml(err.message)}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red);">Erro: ${escHtml(err.message)}</td></tr>`;
+      if (paginEl) paginEl.innerHTML = '';
     }
   },
 
