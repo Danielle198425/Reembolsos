@@ -306,11 +306,78 @@ def delete_user(
         raise HTTPException(404, "Usuário não encontrado")
     if user.id == current_user.id:
         raise HTTPException(400, "Não é possível excluir seu próprio usuário")
+
     target_email = user.email
-    db.query(models.Expense).filter(models.Expense.user_id == user.id).delete()
-    db.delete(user)
-    db.commit()
-    _log_action(db, 'DELETE_USER', target_email=target_email, admin=current_user)
+    uid = user.id
+
+    try:
+        # 1. Desvincular de audit_logs (admin_id vira NULL)
+        db.query(models.AuditLog).filter(models.AuditLog.admin_id == uid).update(
+            {models.AuditLog.admin_id: None}, synchronize_session=False
+        )
+
+        # 2. Desvincular de payment_schedules (reatribui ao admin atual)
+        db.query(models.PaymentSchedule).filter(models.PaymentSchedule.created_by == uid).update(
+            {models.PaymentSchedule.created_by: current_user.id}, synchronize_session=False
+        )
+
+        # 3. Desvincular de exports (target_user_id vira NULL, created_by reatribui ao admin atual)
+        db.query(models.Export).filter(models.Export.target_user_id == uid).update(
+            {models.Export.target_user_id: None}, synchronize_session=False
+        )
+        db.query(models.Export).filter(models.Export.created_by == uid).update(
+            {models.Export.created_by: current_user.id}, synchronize_session=False
+        )
+
+        # 4. Desvincular de aprovações e ações em despesas de terceiros
+        db.query(models.Expense).filter(models.Expense.approved_by == uid).update(
+            {models.Expense.approved_by: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.rejected_by == uid).update(
+            {models.Expense.rejected_by: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.finalized_by == uid).update(
+            {models.Expense.finalized_by: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.paid_by == uid).update(
+            {models.Expense.paid_by: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.sienge_sent_by == uid).update(
+            {models.Expense.sienge_sent_by: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.created_by_admin_id == uid).update(
+            {models.Expense.created_by_admin_id: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.approved_by_admin_id == uid).update(
+            {models.Expense.approved_by_admin_id: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.rejected_by_admin_id == uid).update(
+            {models.Expense.rejected_by_admin_id: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.finalized_by_admin_id == uid).update(
+            {models.Expense.finalized_by_admin_id: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.paid_by_admin_id == uid).update(
+            {models.Expense.paid_by_admin_id: None}, synchronize_session=False
+        )
+
+        # 5. Desvincular export_id e excluir despesas do próprio usuário
+        db.query(models.Expense).filter(models.Expense.user_id == uid).update(
+            {models.Expense.export_id: None}, synchronize_session=False
+        )
+        db.query(models.Expense).filter(models.Expense.user_id == uid).delete(synchronize_session=False)
+
+        # 6. Excluir o usuário
+        db.delete(user)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(400, f"Erro ao excluir usuário: {e}")
+
+    try:
+        _log_action(db, 'DELETE_USER', target_email=target_email, admin=current_user)
+    except Exception:
+        pass
 
 
 @router.post("/users/{user_id}/unlock")

@@ -18,7 +18,7 @@ const AdminPage = {
     } catch (e) {}
 
     this.currentSection = localStorage.getItem('ml_admin_current_section') || 'users';
-    if (isFinanceiro && ['audit', 'unlock', 'impersonate', 'email-closing', 'email-payment'].includes(this.currentSection)) {
+    if (this.currentSection === 'unlock' || (isFinanceiro && ['audit', 'impersonate', 'email-closing', 'email-payment'].includes(this.currentSection))) {
       this.currentSection = 'users';
       localStorage.setItem('ml_admin_current_section', 'users');
     }
@@ -63,7 +63,6 @@ const AdminPage = {
           ${isFinanceiro ? '' : `
           <div class="admin-section-label">SEGURANÇA</div>
           <div class="admin-nav-item" id="anav-audit">Logs de Auditoria</div>
-          <div class="admin-nav-item" id="anav-unlock">Desbloquear Usuários</div>
           <div class="admin-nav-item" id="anav-impersonate">Ver como</div>
 
           <div class="admin-section-label">MODELOS DE E-MAIL</div>
@@ -87,7 +86,7 @@ const AdminPage = {
     if (activeNav) activeNav.classList.add('active');
 
     // Click listeners for active items
-    ['users', 'categories', 'cost-centers', 'sienge-cost-centers', 'sienge-companies', 'sienge-apportionments', 'mileage', 'logo', 'central-policies', 'policies', 'rejection-reasons', 'roles', 'functions', 'audit', 'unlock', 'impersonate', 'email-closing', 'email-payment'].forEach(sec => {
+    ['users', 'categories', 'cost-centers', 'sienge-cost-centers', 'sienge-companies', 'sienge-apportionments', 'mileage', 'logo', 'central-policies', 'policies', 'rejection-reasons', 'roles', 'functions', 'audit', 'impersonate', 'email-closing', 'email-payment'].forEach(sec => {
       document.getElementById('anav-' + sec)?.addEventListener('click', () => {
         document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
         document.getElementById('anav-' + sec).classList.add('active');
@@ -138,7 +137,7 @@ const AdminPage = {
       case 'roles': this.renderRoles(); break;
       case 'functions': this.renderFunctions(); break;
       case 'audit': this.renderAuditLogs(); break;
-      case 'unlock': this.renderUnlockUsers(); break;
+      case 'unlock': this.renderUsers(); break;
       case 'impersonate': this.renderImpersonate(); break;
       case 'email-closing': this.renderEmailTemplates('closing_dates'); break;
       case 'email-payment': this.renderEmailTemplates('payment_date'); break;

@@ -109,6 +109,35 @@ def run_auto_migrations():
         except Exception as e:
             print(f"[migration] expenses_export_id_fkey ON DELETE SET NULL: {e}")
 
+        # Migrações para permitir exclusão limpa de usuários sem violação de Foreign Key
+        user_fk_defs = [
+            ("audit_logs", "admin_id", "users", "id", "SET NULL", True),
+            ("exports", "target_user_id", "users", "id", "SET NULL", True),
+            ("exports", "created_by", "users", "id", "SET NULL", False),
+            ("payment_schedules", "created_by", "users", "id", "SET NULL", False),
+            ("expenses", "user_id", "users", "id", "CASCADE", True),
+            ("expenses", "approved_by", "users", "id", "SET NULL", True),
+            ("expenses", "rejected_by", "users", "id", "SET NULL", True),
+            ("expenses", "finalized_by", "users", "id", "SET NULL", True),
+            ("expenses", "paid_by", "users", "id", "SET NULL", True),
+            ("expenses", "sienge_sent_by", "users", "id", "SET NULL", True),
+            ("expenses", "created_by_admin_id", "users", "id", "SET NULL", True),
+            ("expenses", "approved_by_admin_id", "users", "id", "SET NULL", True),
+            ("expenses", "rejected_by_admin_id", "users", "id", "SET NULL", True),
+            ("expenses", "finalized_by_admin_id", "users", "id", "SET NULL", True),
+            ("expenses", "paid_by_admin_id", "users", "id", "SET NULL", True),
+        ]
+        for tbl, col, ref_tbl, ref_col, action, was_nullable in user_fk_defs:
+            try:
+                cname = f"{tbl}_{col}_fkey"
+                with engine.begin() as conn:
+                    if not was_nullable:
+                        conn.execute(text(f"ALTER TABLE {tbl} ALTER COLUMN {col} DROP NOT NULL;"))
+                    conn.execute(text(f"ALTER TABLE {tbl} DROP CONSTRAINT IF EXISTS {cname};"))
+                    conn.execute(text(f"ALTER TABLE {tbl} ADD CONSTRAINT {cname} FOREIGN KEY ({col}) REFERENCES {ref_tbl}({ref_col}) ON DELETE {action};"))
+            except Exception as e:
+                print(f"[migration] fk {tbl}.{col}: {e}")
+
         try:
             with engine.begin() as conn:
                 conn.execute(text("""

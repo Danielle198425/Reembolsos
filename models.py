@@ -172,7 +172,7 @@ class Export(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(300), nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     target_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     expense_user_ids = Column(Text, nullable=True)
     export_type = Column(String(50), default="Padrão")
@@ -256,7 +256,7 @@ class PaymentSchedule(Base):
     payment_date = Column(Date, nullable=False)
     approval_date = Column(Date, nullable=True)
     closing_date = Column(Date, nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
