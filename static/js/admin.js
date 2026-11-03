@@ -5283,6 +5283,7 @@ const AdminPage = {
   },
 
   async renderEmailTemplates(activeKey = 'closing_dates') {
+    this.activeEmailTemplateKey = activeKey;
     const el = document.getElementById('admin-section-content');
     if (!el) return;
 
@@ -5303,10 +5304,13 @@ const AdminPage = {
         return;
       }
 
+      this.activeEmailTemplateKey = currentTmpl.key || activeKey;
+
         let schedules = [];
         try { schedules = await Api.getPaymentCalendar(); } catch (e) {}
 
         const renderView = () => {
+          this.activeEmailTemplateKey = currentTmpl?.key || this.activeEmailTemplateKey || activeKey;
           const isClosing = this.activeEmailTemplateKey === 'closing_dates';
 
           // Sample placeholder data for live preview
@@ -5609,12 +5613,13 @@ const AdminPage = {
         // Save form
         document.getElementById('email-template-form').addEventListener('submit', async (e) => {
           e.preventDefault();
+          const tmplKey = this.activeEmailTemplateKey || currentTmpl?.key || activeKey;
           const saveBtn = document.getElementById('save-tmpl-btn');
           saveBtn.disabled = true;
           saveBtn.textContent = 'Salvando...';
 
           try {
-            const res = await Api.updateEmailTemplate(this.activeEmailTemplateKey, {
+            const res = await Api.updateEmailTemplate(tmplKey, {
               subject: subjectInput.value,
               body: bodyTextarea.value
             });
@@ -5631,9 +5636,10 @@ const AdminPage = {
 
         // Reset button
         document.getElementById('reset-tmpl-btn').addEventListener('click', async () => {
+          const tmplKey = this.activeEmailTemplateKey || currentTmpl?.key || activeKey;
           if (!confirm(`Deseja restaurar o modelo "${currentTmpl.name}" para o texto padrão original?`)) return;
           try {
-            const res = await Api.resetEmailTemplate(this.activeEmailTemplateKey);
+            const res = await Api.resetEmailTemplate(tmplKey);
             toast(res.message, 'success');
             subjectInput.value = res.template.subject;
             bodyTextarea.value = res.template.body;
@@ -5655,8 +5661,9 @@ const AdminPage = {
           testBtn.disabled = true;
           testBtn.textContent = 'Enviando...';
 
+          const tmplKey = this.activeEmailTemplateKey || currentTmpl?.key || activeKey;
           try {
-            const res = await Api.sendTestEmailTemplate(this.activeEmailTemplateKey, {
+            const res = await Api.sendTestEmailTemplate(tmplKey, {
               target_email: target,
               subject: subjectInput.value,
               body: bodyTextarea.value

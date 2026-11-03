@@ -1862,6 +1862,25 @@ DEFAULT_EMAIL_TEMPLATES = {
 }
 
 
+
+EMAIL_TEMPLATE_KEY_ALIASES = {
+    "email-closing": "closing_dates",
+    "email_closing": "closing_dates",
+    "closing_date": "closing_dates",
+    "closing_dates": "closing_dates",
+    "closing": "closing_dates",
+    "email-payment": "payment_date",
+    "email_payment": "payment_date",
+    "payment_dates": "payment_date",
+    "payment_date": "payment_date",
+    "payment": "payment_date",
+}
+
+
+def _resolve_template_key(key: str) -> str:
+    cleaned = (key or "").strip().lower()
+    return EMAIL_TEMPLATE_KEY_ALIASES.get(cleaned, cleaned)
+
 def _ensure_default_email_templates(db: Session):
     from database import Base, engine
     Base.metadata.create_all(bind=engine)
@@ -1911,6 +1930,7 @@ def get_email_template(
     current_user: models.User = Depends(auth.require_admin),
     db: Session = Depends(get_db)
 ):
+    key = _resolve_template_key(key)
     _ensure_default_email_templates(db)
     template = db.query(models.EmailTemplate).filter(models.EmailTemplate.key == key).first()
     if not template:
@@ -1934,6 +1954,7 @@ def update_email_template(
     current_user: models.User = Depends(auth.require_admin),
     db: Session = Depends(get_db)
 ):
+    key = _resolve_template_key(key)
     _ensure_default_email_templates(db)
     template = db.query(models.EmailTemplate).filter(models.EmailTemplate.key == key).first()
     if not template:
@@ -1977,6 +1998,7 @@ def reset_email_template(
     current_user: models.User = Depends(auth.require_admin),
     db: Session = Depends(get_db)
 ):
+    key = _resolve_template_key(key)
     if key not in DEFAULT_EMAIL_TEMPLATES:
         raise HTTPException(status_code=404, detail=f"Modelo padrão para '{key}' não existe.")
 
@@ -2028,6 +2050,7 @@ def send_test_email_template(
     current_user: models.User = Depends(auth.require_admin),
     db: Session = Depends(get_db)
 ):
+    key = _resolve_template_key(key)
     _ensure_default_email_templates(db)
     template = db.query(models.EmailTemplate).filter(models.EmailTemplate.key == key).first()
     if not template:

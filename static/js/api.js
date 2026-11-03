@@ -240,8 +240,20 @@ const Api = {
 
   // ── Admin — Modelos de E-mail ─────────────────────────────────────────────
   getEmailTemplates() { return Api.get('/api/admin/email-templates'); },
-  getEmailTemplate(key) { return Api.get(`/api/admin/email-templates/${key}`); },
-  updateEmailTemplate(key, data) { return Api.put(`/api/admin/email-templates/${key}`, data); },
-  resetEmailTemplate(key) { return Api.post(`/api/admin/email-templates/${key}/reset`); },
-  sendTestEmailTemplate(key, data) { return Api.post(`/api/admin/email-templates/${key}/send-test`, data); },
+  getEmailTemplate(key) {
+    if (!key) throw new Error("Chave do modelo de e-mail não informada.");
+    return Api.get(`/api/admin/email-templates/${encodeURIComponent(key)}`);
+  },
+  updateEmailTemplate(key, data) {
+    if (!key) throw new Error("Chave do modelo de e-mail não informada.");
+    return Api.put(`/api/admin/email-templates/${encodeURIComponent(key)}`, data);
+  },
+  resetEmailTemplate(key) {
+    if (!key) throw new Error("Chave do modelo de e-mail não informada.");
+    return Api.post(`/api/admin/email-templates/${encodeURIComponent(key)}/reset`);
+  },
+  sendTestEmailTemplate(key, data) {
+    if (!key) throw new Error("Chave do modelo de e-mail não informada.");
+    return Api.post(`/api/admin/email-templates/${encodeURIComponent(key)}/send-test`, data);
+  },
 };
