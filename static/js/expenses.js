@@ -319,18 +319,7 @@ const ExpensesPage = {
     const savedDateTo = localStorage.getItem('ml_filter_expenses_date_to') || '';
     const savedMonth = localStorage.getItem('ml_filter_expenses_month') || '';
     const savedSearch = localStorage.getItem('ml_filter_expenses_search') || '';
-    const savedTab = localStorage.getItem('ml_filter_expenses_tab') || 'pending';
-
-
-    if (document.getElementById('filter-status')) document.getElementById('filter-status').value = savedStatus;
-    if (document.getElementById('filter-category')) document.getElementById('filter-category').value = savedCategory;
-    if (document.getElementById('filter-cc')) document.getElementById('filter-cc').value = savedCc;
-    if (document.getElementById('filter-month')) document.getElementById('filter-month').value = savedMonth;
-    if (document.getElementById('filter-date-from')) document.getElementById('filter-date-from').value = savedDateFrom;
-    if (document.getElementById('filter-date-to')) document.getElementById('filter-date-to').value = savedDateTo;
-    if (document.getElementById('exp-search')) document.getElementById('exp-search').value = savedSearch;
-
-
+    // savedTab is already defined at start of render()
     this.currentTab = savedTab;
     document.querySelectorAll('#expense-tabs .tab').forEach(t => {
       if (t.dataset.tab === this.currentTab) {
@@ -450,6 +439,19 @@ const ExpensesPage = {
     const isPending = this.currentTab === 'pending';
     filtersEl.classList.toggle('hide-on-mobile', isPending);
     filtersEl.setAttribute('data-tab', this.currentTab);
+    if (window.innerWidth <= 768) {
+      filtersEl.style.setProperty('display', isPending ? 'none' : 'flex', 'important');
+    } else {
+      filtersEl.style.removeProperty('display');
+    }
+    if (!this._resizeBound) {
+      this._resizeBound = true;
+      window.addEventListener('resize', () => {
+        if (typeof App !== 'undefined' && App.currentPage === 'expenses') {
+          this._updateTabFilterVisibility();
+        }
+      });
+    }
   },
 
 

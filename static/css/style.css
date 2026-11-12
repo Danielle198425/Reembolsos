@@ -1954,12 +1954,13 @@ tbody td {
   #dash-recent-table tbody td.col-dash-desc { grid-area: desc; font-size: 12px; color: var(--text-2); padding-top: 4px !important; border-top: 1px dashed var(--border) !important; }
 }
 
-.mobile-bottom-nav {
-  display: none !important;
-}
-
-.show-on-mobile {
-  display: none !important;
+@media (min-width: 769px) {
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+  .show-on-mobile {
+    display: none !important;
+  }
 }
 
 
