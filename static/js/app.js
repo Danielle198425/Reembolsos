@@ -341,23 +341,21 @@ function showApp(user) {
 
   if (['admin', 'financeiro'].includes(user.role)) {
     document.getElementById('nav-admin')?.classList.remove('hidden');
-    document.getElementById('mobile-nav-admin')?.classList.remove('hidden');
   } else {
     document.getElementById('nav-admin')?.classList.add('hidden');
-    document.getElementById('mobile-nav-admin')?.classList.add('hidden');
   }
 
   if (['admin', 'financeiro'].includes(user.role)) {
     document.getElementById('nav-payment-calendar')?.classList.remove('hidden');
-    document.getElementById('mobile-nav-payment-calendar')?.classList.remove('hidden');
   } else {
     document.getElementById('nav-payment-calendar')?.classList.add('hidden');
-    document.getElementById('mobile-nav-payment-calendar')?.classList.add('hidden');
   }
 
-  // Navigate to requested page (redirect if non-admin on admin route)
+  // Navigate to requested page (redirect if non-admin on admin route, or if mobile on admin/calendar)
   let initialPage = getRequestedPage();
-  if (initialPage === 'admin' && !['admin', 'financeiro'].includes(user.role)) {
+  if (window.innerWidth <= 768 && (initialPage === 'admin' || initialPage === 'payment-calendar')) {
+    initialPage = 'dashboard';
+  } else if (initialPage === 'admin' && !['admin', 'financeiro'].includes(user.role)) {
     initialPage = 'dashboard';
   }
   navigate(initialPage, false);

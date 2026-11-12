@@ -1732,7 +1732,9 @@ tbody td {
   .mobile-nav-item.active .mobile-nav-icon {
     transform: scale(1.15) !important;
   }
-  .mobile-nav-item.hidden {
+  .mobile-nav-item.hidden,
+  #mobile-nav-payment-calendar,
+  #mobile-nav-admin {
     display: none !important;
   }
 
