@@ -142,6 +142,9 @@ const ExpensesPage = {
 
     const colSpan = isAdminOrFinance ? 10 : 9;
     const isInitialCollapsed = localStorage.getItem('ml_expense_desc_collapsed') !== 'false';
+    const savedTab = localStorage.getItem('ml_filter_expenses_tab') || 'pending';
+    this.currentTab = savedTab;
+    const isPendingTab = this.currentTab === 'pending';
 
     const monthNames = [
       'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -180,13 +183,13 @@ const ExpensesPage = {
 
 
       <div class="tabs" id="expense-tabs">
-        <div class="tab active" data-tab="pending" id="tab-pending">PENDENTES</div>
+        <div class="tab ${isPendingTab ? 'active' : ''}" data-tab="pending" id="tab-pending">PENDENTES</div>
         <div class="tab" data-tab="all" id="tab-all">TODAS AS DESPESAS</div>
       </div>
 
 
       <div class="table-wrapper">
-        <div class="filters-bar" id="expense-filters">
+        <div class="filters-bar ${isPendingTab ? 'hide-on-mobile' : ''}" id="expense-filters" data-tab="${this.currentTab}">
           <div class="search-wrapper hide-on-mobile">
             <span class="search-icon">🔍</span>
             <input type="text" class="search-input" id="exp-search" placeholder="Buscar despesa..." />
@@ -444,11 +447,9 @@ const ExpensesPage = {
   _updateTabFilterVisibility() {
     const filtersEl = document.getElementById('expense-filters');
     if (!filtersEl) return;
-    if (this.currentTab === 'pending') {
-      filtersEl.classList.add('hide-on-mobile');
-    } else {
-      filtersEl.classList.remove('hide-on-mobile');
-    }
+    const isPending = this.currentTab === 'pending';
+    filtersEl.classList.toggle('hide-on-mobile', isPending);
+    filtersEl.setAttribute('data-tab', this.currentTab);
   },
 
 

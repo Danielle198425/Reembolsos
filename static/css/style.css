@@ -1671,6 +1671,12 @@ tbody td {
     gap: 8px !important;
     padding: 12px 14px !important;
   }
+  .filters-bar.hide-on-mobile,
+  #expense-filters.hide-on-mobile,
+  #expense-filters[data-tab="pending"],
+  .filters-bar[data-tab="pending"] {
+    display: none !important;
+  }
   .filters-bar .filter-select {
     width: 100% !important;
     max-width: 100% !important;
