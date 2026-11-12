@@ -548,16 +548,32 @@ const DashboardPage = {
           </tr>
         </thead>
         <tbody>
-          ${expenses.map(e => `
+          ${expenses.map(e => {
+            const catLower = (e.category_name || '').toLowerCase();
+            let desc = e.description || '';
+            if (catLower.includes('quilometragem') || catLower.includes('km') || catLower.includes('viagem') || desc.toLowerCase().startsWith('quilometragem:')) {
+              let kmObs = '';
+              if (e.notes) {
+                const raw = e.notes;
+                const idx = raw.indexOf(" · Taxa R$");
+                kmObs = idx !== -1 ? raw.substring(0, idx).trim() : (raw.startsWith("Taxa R$") ? "" : raw.trim());
+              }
+              if (kmObs) desc = kmObs;
+              else if (desc.toLowerCase().startsWith('quilometragem:')) {
+                const matchKm = desc.match(/\((\d+(?:\.\d+)?\s*km.*?\))/i);
+                desc = matchKm ? `Quilometragem ${matchKm[0]}` : 'Quilometragem';
+              }
+            }
+            return `
             <tr style="cursor:pointer;" onclick="navigate('expenses')">
               <td>${statusBadge(e.status)}</td>
               <td>${fmtDate(e.expense_date)}</td>
               <td>${escHtml(e.user_name)}</td>
               <td class="amount-cell">${fmt(e.amount)}</td>
               <td>${escHtml(e.category_name)}</td>
-              <td class="expense-description" title="${escHtml(e.description)}">${escHtml(e.description)}</td>
-            </tr>
-          `).join('')}
+              <td class="expense-description" title="${escHtml(e.description || desc)}">${escHtml(desc)}</td>
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>`;
   },

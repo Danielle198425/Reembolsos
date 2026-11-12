@@ -128,7 +128,15 @@ const ExpensesPage = {
       tabPers.classList.toggle('active', scope === 'personal');
       tabTeam.classList.toggle('active', scope !== 'personal');
     }
+    this._applyScopeUserVisibility();
     this.loadExpenses();
+  },
+
+  _applyScopeUserVisibility() {
+    const uSel = document.getElementById('filter-user');
+    if (uSel) {
+      uSel.style.display = this._currentScope === 'personal' ? 'none' : '';
+    }
   },
 
   async render() {
@@ -147,6 +155,21 @@ const ExpensesPage = {
     const colSpan = isAdminOrFinance ? 10 : 9;
     const isInitialCollapsed = localStorage.getItem('ml_expense_desc_collapsed') !== 'false';
 
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    let monthOptions = '<option value="">Todos os meses</option>';
+    const nowMonth = new Date();
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(nowMonth.getFullYear(), nowMonth.getMonth() - i, 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const val = `${yyyy}-${mm}`;
+      const label = `${monthNames[d.getMonth()]}/${yyyy}`;
+      monthOptions += `<option value="${val}">${label}</option>`;
+    }
+
     const el = document.getElementById('page-expenses');
     el.innerHTML = `
       ${isApproverOrAdmin ? `
@@ -163,7 +186,7 @@ const ExpensesPage = {
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-primary" id="btn-new-expense">＋ Nova Despesa</button>
-          ${isAdminOrFinance ? `<button class="btn btn-secondary" id="btn-exec-report">⬇ Exportar Selecionados</button>` : ''}
+          ${isAdminOrFinance ? `<button class="btn btn-secondary hide-on-mobile" id="btn-exec-report">⬇ Exportar Selecionados</button>` : ''}
         </div>
       </div>
 
@@ -176,7 +199,7 @@ const ExpensesPage = {
 
       <div class="table-wrapper">
         <div class="filters-bar" id="expense-filters">
-          <div class="search-wrapper">
+          <div class="search-wrapper hide-on-mobile">
             <span class="search-icon">🔍</span>
             <input type="text" class="search-input" id="exp-search" placeholder="Buscar despesa..." />
           </div>
@@ -194,14 +217,17 @@ const ExpensesPage = {
             <option value="enviado">Enviado</option>
             <option value="pago">Pago</option>
           </select>
-          <select class="filter-select" id="filter-category">
+          <select class="filter-select hide-on-mobile" id="filter-category">
             <option value="">Todas as categorias</option>
           </select>
-          <select class="filter-select" id="filter-cc">
+          <select class="filter-select hide-on-mobile" id="filter-cc">
             <option value="">Todos os CCs</option>
           </select>
-          <input type="date" class="filter-select" id="filter-date-from" title="Data inicial" />
-          <input type="date" class="filter-select" id="filter-date-to" title="Data final" />
+          <select class="filter-select show-on-mobile" id="filter-month">
+            ${monthOptions}
+          </select>
+          <input type="date" class="filter-select hide-on-mobile" id="filter-date-from" title="Data inicial" />
+          <input type="date" class="filter-select hide-on-mobile" id="filter-date-to" title="Data final" />
           <button class="btn btn-sm btn-ghost" id="clear-filters-btn">✕ Limpar</button>
         </div>
 
@@ -212,8 +238,8 @@ const ExpensesPage = {
             <span class="table-total" id="exp-total" style="font-size:13px;color:var(--text-3);font-weight:500;"></span>
           </div>
           <div class="table-actions" style="display:flex;align-items:center;gap:8px;">
-            ${isAdminOrFinance ? `<button class="btn btn-sm btn-secondary" id="btn-sync-sienge-payments" title="Consultar parcelas no Sienge e atualizar para 'pago' se quitadas (PG)">🔄 Sincronizar Sienge</button>` : ''}
-            ${isAdminOrFinance ? `<button class="btn btn-sm btn-primary" id="btn-bulk-sienge">Gerar Título</button>` : ''}
+            ${isAdminOrFinance ? `<button class="btn btn-sm btn-secondary hide-on-mobile" id="btn-sync-sienge-payments" title="Consultar parcelas no Sienge e atualizar para 'pago' se quitadas (PG)">🔄 Sincronizar Sienge</button>` : ''}
+            ${isAdminOrFinance ? `<button class="btn btn-sm btn-primary hide-on-mobile" id="btn-bulk-sienge">Gerar Título</button>` : ''}
             <button class="btn btn-sm btn-ghost" id="reload-expenses-btn" title="Recarregar">↻</button>
           </div>
         </div>
@@ -292,6 +318,7 @@ const ExpensesPage = {
 
     // Load aux data
     await this._loadAux();
+    this._applyScopeUserVisibility();
 
 
     // Restore filters from localStorage
@@ -300,6 +327,7 @@ const ExpensesPage = {
     const savedCc = localStorage.getItem('ml_filter_expenses_cc') || '';
     const savedDateFrom = localStorage.getItem('ml_filter_expenses_date_from') || '';
     const savedDateTo = localStorage.getItem('ml_filter_expenses_date_to') || '';
+    const savedMonth = localStorage.getItem('ml_filter_expenses_month') || '';
     const savedSearch = localStorage.getItem('ml_filter_expenses_search') || '';
     const savedTab = localStorage.getItem('ml_filter_expenses_tab') || 'pending';
 
@@ -307,6 +335,7 @@ const ExpensesPage = {
     if (document.getElementById('filter-status')) document.getElementById('filter-status').value = savedStatus;
     if (document.getElementById('filter-category')) document.getElementById('filter-category').value = savedCategory;
     if (document.getElementById('filter-cc')) document.getElementById('filter-cc').value = savedCc;
+    if (document.getElementById('filter-month')) document.getElementById('filter-month').value = savedMonth;
     if (document.getElementById('filter-date-from')) document.getElementById('filter-date-from').value = savedDateFrom;
     if (document.getElementById('filter-date-to')) document.getElementById('filter-date-to').value = savedDateTo;
     if (document.getElementById('exp-search')) document.getElementById('exp-search').value = savedSearch;
@@ -361,7 +390,7 @@ const ExpensesPage = {
     });
 
 
-    ['filter-user','filter-status','filter-category','filter-cc','filter-date-from','filter-date-to'].forEach(id => {
+    ['filter-user','filter-status','filter-category','filter-cc','filter-date-from','filter-date-to','filter-month'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', (e) => {
         const key = 'ml_filter_expenses_' + id.replace('filter-', '').replace('-', '_');
         localStorage.setItem(key, e.target.value);
@@ -373,7 +402,7 @@ const ExpensesPage = {
       this.loadExpenses();
     }, 350));
     document.getElementById('clear-filters-btn').addEventListener('click', () => {
-      ['filter-user','filter-status','filter-category','filter-cc'].forEach(id => {
+      ['filter-user','filter-status','filter-category','filter-cc','filter-month'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
         localStorage.setItem('ml_filter_expenses_' + id.replace('filter-', '').replace('-', '_'), '');
@@ -526,6 +555,17 @@ const ExpensesPage = {
       const isApproverOrAdmin = ['admin', 'financeiro', 'aprovador'].includes(App.user?.role);
       const scope = isApproverOrAdmin ? (this._currentScope || localStorage.getItem('active_scope') || 'personal') : 'personal';
       const userVal = document.getElementById('filter-user')?.value || '';
+      const monthVal = document.getElementById('filter-month')?.value || '';
+      let dateFrom = document.getElementById('filter-date-from')?.value || '';
+      let dateTo = document.getElementById('filter-date-to')?.value || '';
+
+      if (monthVal && (!dateFrom && !dateTo || window.innerWidth <= 768)) {
+        const [y, m] = monthVal.split('-').map(Number);
+        dateFrom = `${monthVal}-01`;
+        const lastDay = new Date(y, m, 0).getDate();
+        dateTo = `${monthVal}-${String(lastDay).padStart(2, '0')}`;
+      }
+
       const params = {
         scope: scope,
         pending_only: this.currentTab === 'pending',
@@ -533,8 +573,8 @@ const ExpensesPage = {
         status: document.getElementById('filter-status').value,
         category_id: document.getElementById('filter-category').value,
         cost_center_id: document.getElementById('filter-cc').value,
-        date_from: document.getElementById('filter-date-from').value,
-        date_to: document.getElementById('filter-date-to').value,
+        date_from: dateFrom,
+        date_to: dateTo,
       };
 
 
@@ -854,6 +894,24 @@ const ExpensesPage = {
     const checkboxDisabled = !isSelectable ? 'disabled style="cursor:not-allowed;opacity:0.35;"' : '';
     const isChecked = checkedIds && checkedIds.has(e.id);
 
+    let displayDesc = e.description || '';
+    const catNameLower = (e.category_name || '').toLowerCase();
+    const isKmExpense = catNameLower.includes('quilometragem') || catNameLower.includes('km') || catNameLower.includes('viagem') || (displayDesc.toLowerCase().startsWith('quilometragem:'));
+    if (isKmExpense) {
+      let kmObservation = '';
+      if (e.notes) {
+        let rawNotes = e.notes;
+        const taxIdx = rawNotes.indexOf(" · Taxa R$");
+        kmObservation = taxIdx !== -1 ? rawNotes.substring(0, taxIdx).trim() : (rawNotes.startsWith("Taxa R$") ? "" : rawNotes.trim());
+      }
+      if (kmObservation) {
+        displayDesc = kmObservation;
+      } else if (displayDesc.toLowerCase().startsWith('quilometragem:')) {
+        const matchKm = displayDesc.match(/\((\d+(?:\.\d+)?\s*km.*?\))/i);
+        displayDesc = matchKm ? `Quilometragem ${matchKm[0]}` : 'Quilometragem';
+      }
+    }
+
     return `
       <tr data-id="${e.id}" class="expense-row">
         ${isAdminOrFinance ? `<td class="col-check" style="width:36px;text-align:center;"><input type="checkbox" class="exp-checkbox" value="${e.id}" data-status="${e.status}" title="${checkboxTitle}" ${checkboxDisabled} ${isChecked ? 'checked' : ''} /></td>` : ''}
@@ -879,7 +937,7 @@ const ExpensesPage = {
         <td class="col-amount amount-cell">${fmt(e.amount)}</td>
         <td class="col-category">${escHtml(e.category_name)}</td>
         <td class="col-cc" style="font-size:12px;color:var(--text-3);">${escHtml(e.cost_center_code)} ${escHtml(e.cost_center_name)}</td>
-        <td class="col-despesa"><span class="expense-description" title="${escHtml(e.description)}">${escHtml(e.description)}</span></td>
+        <td class="col-despesa"><span class="expense-description" title="${escHtml(e.description || displayDesc)}">${escHtml(displayDesc)}</span></td>
         <td class="col-actions">
           <div class="td-actions">
             <button class="action-btn" title="Ver detalhes" data-action="view" data-id="${e.id}">👁</button>
