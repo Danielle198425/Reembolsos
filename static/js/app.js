@@ -155,6 +155,12 @@ const Modal = {
     document.getElementById('modal-overlay').classList.remove('hidden');
   },
   close() {
+    if (window._activeCameraStream) {
+      try {
+        window._activeCameraStream.getTracks().forEach(t => t.stop());
+      } catch (e) {}
+      window._activeCameraStream = null;
+    }
     document.getElementById('modal-overlay').classList.add('hidden');
     document.getElementById('modal-body').innerHTML = '';
     document.getElementById('modal-footer').innerHTML = '';

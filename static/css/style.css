@@ -1509,5 +1509,148 @@ tbody td {
   transform: translateX(16px);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE EXPENSES CARDS (MOBILE / PWA)
+═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .table-wrapper {
+    overflow-x: visible !important;
+  }
+
+  #expenses-table {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  #expenses-table thead {
+    display: none !important;
+  }
+
+  #expenses-table tbody {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+
+  #expenses-table tbody tr.expense-row {
+    display: grid !important;
+    grid-template-columns: auto 1fr auto !important;
+    grid-template-areas:
+      "check status date"
+      "user  user   amount"
+      "cat   cat    cat"
+      "cc    cc     cc"
+      "desc  desc   desc"
+      "act   act    act" !important;
+    grid-gap: 8px 10px !important;
+    align-items: center !important;
+    background: #ffffff !important;
+    border: 1px solid var(--border, #E2E8F0) !important;
+    border-radius: 14px !important;
+    padding: 14px !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  #expenses-table tr.expense-row td {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  #expenses-table tr.expense-row .col-check {
+    grid-area: check;
+    display: flex !important;
+    align-items: center;
+  }
+  #expenses-table tr.expense-row .col-check input {
+    width: 18px;
+    height: 18px;
+  }
+
+  #expenses-table tr.expense-row .col-alerts {
+    display: none !important;
+  }
+
+  #expenses-table tr.expense-row .col-status {
+    grid-area: status;
+    display: flex !important;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  #expenses-table tr.expense-row .col-date {
+    grid-area: date;
+    text-align: right;
+    font-size: 13px !important;
+    color: var(--text-3, #64748B) !important;
+    font-weight: 600;
+  }
+
+  #expenses-table tr.expense-row .col-user {
+    grid-area: user;
+    display: flex !important;
+    align-items: center;
+    padding-top: 2px !important;
+  }
+
+  #expenses-table tr.expense-row .col-amount {
+    grid-area: amount;
+    text-align: right;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    color: var(--ml-indigo, #227F3F) !important;
+  }
+
+  #expenses-table tr.expense-row .col-category {
+    grid-area: cat;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: var(--text-1, #1E293B) !important;
+  }
+
+  #expenses-table tr.expense-row .col-cc {
+    grid-area: cc;
+    font-size: 12px !important;
+    color: var(--text-3, #64748B) !important;
+  }
+
+  #expenses-table tr.expense-row .col-despesa {
+    grid-area: desc;
+    padding-top: 6px !important;
+    border-top: 1px dashed var(--border, #E2E8F0) !important;
+    font-size: 13px !important;
+    color: var(--text-2, #334155) !important;
+  }
+  #expenses-table tr.expense-row .col-despesa .expense-description {
+    white-space: normal !important;
+    line-height: 1.4 !important;
+    display: block !important;
+  }
+
+  #expenses-table tr.expense-row .col-actions {
+    grid-area: act;
+    padding-top: 8px !important;
+    border-top: 1px solid var(--border, #E2E8F0) !important;
+  }
+  #expenses-table tr.expense-row .col-actions .td-actions {
+    justify-content: flex-end !important;
+    gap: 10px !important;
+  }
+  #expenses-table tr.expense-row .col-actions .action-btn {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 16px !important;
+    border-radius: 8px !important;
+  }
+}
+
+
 
 

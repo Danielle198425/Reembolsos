@@ -855,17 +855,17 @@ const ExpensesPage = {
     const isChecked = checkedIds && checkedIds.has(e.id);
 
     return `
-      <tr data-id="${e.id}">
-        ${isAdminOrFinance ? `<td style="width:36px;text-align:center;"><input type="checkbox" class="exp-checkbox" value="${e.id}" data-status="${e.status}" title="${checkboxTitle}" ${checkboxDisabled} ${isChecked ? 'checked' : ''} /></td>` : ''}
-        <td style="width:28px;padding:0 2px;text-align:center;">
+      <tr data-id="${e.id}" class="expense-row">
+        ${isAdminOrFinance ? `<td class="col-check" style="width:36px;text-align:center;"><input type="checkbox" class="exp-checkbox" value="${e.id}" data-status="${e.status}" title="${checkboxTitle}" ${checkboxDisabled} ${isChecked ? 'checked' : ''} /></td>` : ''}
+        <td class="col-alerts" style="width:28px;padding:0 2px;text-align:center;">
           <div style="display:inline-flex;align-items:center;justify-content:center;gap:2px;">
             ${alertBadge}
             ${impAlertBadge}
           </div>
         </td>
-        <td ${statusTooltip ? `title="${escHtml(statusTooltip)}" style="cursor:help;"` : ''}>${statusBadge(e.status, statusTooltip, statusExtraClass)}</td>
-        <td>${fmtDate(e.expense_date)}</td>
-        <td>
+        <td class="col-status" ${statusTooltip ? `title="${escHtml(statusTooltip)}" style="cursor:help;"` : ''}>${statusBadge(e.status, statusTooltip, statusExtraClass)}</td>
+        <td class="col-date">${fmtDate(e.expense_date)}</td>
+        <td class="col-user">
           <div style="display:flex;align-items:center;gap:8px;">
             <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--ml-indigo),var(--ml-lilac));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;">${initials(e.user_name)}</div>
             <div style="min-width:0;">
@@ -876,11 +876,11 @@ const ExpensesPage = {
             </div>
           </div>
         </td>
-        <td class="amount-cell">${fmt(e.amount)}</td>
-        <td>${escHtml(e.category_name)}</td>
-        <td style="font-size:12px;color:var(--text-3);">${escHtml(e.cost_center_code)} ${escHtml(e.cost_center_name)}</td>
+        <td class="col-amount amount-cell">${fmt(e.amount)}</td>
+        <td class="col-category">${escHtml(e.category_name)}</td>
+        <td class="col-cc" style="font-size:12px;color:var(--text-3);">${escHtml(e.cost_center_code)} ${escHtml(e.cost_center_name)}</td>
         <td class="col-despesa"><span class="expense-description" title="${escHtml(e.description)}">${escHtml(e.description)}</span></td>
-        <td>
+        <td class="col-actions">
           <div class="td-actions">
             <button class="action-btn" title="Ver detalhes" data-action="view" data-id="${e.id}">👁</button>
             ${canApprove ? `
@@ -1292,7 +1292,8 @@ const ExpensesPage = {
           inp.onchange = async () => {
             if (!inp.files[0]) return;
             try {
-              await Api.uploadReceipt(id, inp.files[0]);
+              const compressed = await ExpensesPage.compressImageIfNeeded(inp.files[0]);
+              await Api.uploadReceipt(id, compressed);
               toast('Comprovante anexado!', 'success');
               Modal.close();
               this.loadExpenses();
@@ -1373,9 +1374,49 @@ const ExpensesPage = {
           </div>
         </div>` : ''}
         <div class="field span-2 required" id="ef-receipt-wrap">
-          <label for="ef-receipt">Anexo do Comprovante (PDF/JPG/PNG)</label>
-          <input type="file" id="ef-receipt" accept=".pdf,.png,.jpg,.jpeg" />
-          <div id="ocr-loading" style="display:none;font-size:12px;color:var(--ml-indigo);margin-top:4px;">
+          <label style="font-weight:600;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span>Comprovante (Foto ou PDF)</span>
+            <span id="receipt-status-badge" style="display:${expense?.receipt_path ? 'inline-block' : 'none'};font-size:12px;color:var(--ml-indigo);font-weight:700;">✅ Anexado</span>
+          </label>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button type="button" id="btn-take-photo" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;border-radius:8px;font-weight:600;">
+              📷 Tirar Foto
+            </button>
+            <button type="button" id="btn-pick-file" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;border-radius:8px;font-weight:600;">
+              📁 Escolher Arquivo / Galeria
+            </button>
+          </div>
+
+          <input type="file" id="ef-receipt-camera" accept="image/*" capture="environment" style="display:none;" />
+          <input type="file" id="ef-receipt-gallery" accept="image/jpeg,image/png,image/webp,application/pdf" style="display:none;" />
+          <input type="file" id="ef-receipt" style="display:none;" />
+
+          <div id="camera-modal-container" style="display:none;margin-top:10px;background:#000;border-radius:12px;overflow:hidden;position:relative;">
+            <video id="camera-video-preview" autoplay playsinline style="width:100%;max-height:280px;object-fit:cover;display:block;"></video>
+            <div style="display:flex;justify-content:center;gap:12px;padding:10px;background:rgba(0,0,0,0.7);position:absolute;bottom:0;left:0;right:0;z-index:10;">
+              <button type="button" id="btn-capture-camera" class="btn btn-primary" style="background:var(--ml-indigo);color:#fff;padding:6px 18px;border-radius:20px;font-size:13px;font-weight:600;">
+                📸 Capturar Foto
+              </button>
+              <button type="button" id="btn-cancel-camera" class="btn btn-ghost" style="color:#fff;padding:6px 14px;font-size:13px;">
+                Cancelar
+              </button>
+            </div>
+          </div>
+
+          <div id="receipt-preview-box" style="display:${expense?.receipt_path ? 'flex' : 'none'};margin-top:10px;padding:10px 14px;background:var(--bg-hover,#F8FAFC);border:1px solid var(--border,#E2E8F0);border-radius:10px;align-items:center;justify-content:space-between;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+              <img id="receipt-thumb" src="${(expense?.receipt_path && !expense.receipt_path.toLowerCase().endsWith('.pdf')) ? (expense.receipt_path.startsWith('http') ? expense.receipt_path : `/uploads/${expense.receipt_path}`) : ''}" style="width:42px;height:42px;object-fit:cover;border-radius:6px;display:${(expense?.receipt_path && !expense.receipt_path.toLowerCase().endsWith('.pdf')) ? 'block' : 'none'};border:1px solid var(--border);" />
+              <span id="receipt-pdf-icon" style="font-size:24px;display:${(expense?.receipt_path && expense.receipt_path.toLowerCase().endsWith('.pdf')) ? 'inline-block' : 'none'};">📄</span>
+              <div style="min-width:0;">
+                <div id="receipt-filename" style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-1);">${escHtml(expense?.receipt_path ? expense.receipt_path.split('/').pop() : '')}</div>
+                <div id="receipt-filesize" style="font-size:11px;color:var(--text-3);">${expense?.receipt_path ? 'Comprovante salvo' : ''}</div>
+              </div>
+            </div>
+            <button type="button" id="btn-remove-receipt" class="btn btn-sm btn-ghost" style="color:var(--red);font-size:12px;padding:4px 8px;" title="Remover comprovante">✕ Remover</button>
+          </div>
+
+          <div id="ocr-loading" style="display:none;font-size:12px;color:var(--ml-indigo);margin-top:6px;">
             <span class="spinner" style="width:12px;height:12px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:4px;"></span>
             Lendo comprovante com IA...
           </div>
@@ -1675,71 +1716,248 @@ const ExpensesPage = {
     }
 
 
-    // OCR change event
-    const receiptInput = document.getElementById('ef-receipt');
-    if (receiptInput) {
-      receiptInput.addEventListener('change', async (e) => {
-        if (!e.target.files.length) return;
-        const file = e.target.files[0];
-        const loader = document.getElementById('ocr-loading');
-        if (loader) loader.style.display = 'block';
+    // Receipt Attachment Controls (Photo / File / OCR with auto-compression)
+    this._selectedReceiptFile = null;
+
+    const stopCamera = () => {
+      if (window._activeCameraStream) {
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-          const res = await fetch('/api/expenses/ocr', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + Api.getToken() },
-            body: formData
-          });
-          if (res.ok) {
-            const data = await res.json();
-            let countExtracted = 0;
-            if (data.provider) {
-              document.getElementById('ef-provider').value = data.provider;
-              if (data.provider !== 'Estabelecimento Comercial') countExtracted++;
-            }
-            if (data.date) {
-              document.getElementById('ef-date').value = data.date;
-              countExtracted++;
-            }
-            if (data.amount && data.amount > 0) {
-              const strVal = data.amount.toFixed(2).replace('.', ',');
-              document.getElementById('ef-amount').value = 'R$ ' + strVal;
-              countExtracted++;
-            }
-            if (data.category_suggestion) {
-              const sel = document.getElementById('ef-category');
-              for (let i=0; i<sel.options.length; i++) {
-                if (sel.options[i].text.toLowerCase().includes(data.category_suggestion.toLowerCase())) {
-                  sel.selectedIndex = i;
-                  break;
-                }
-              }
-            }
-            this._onCategoryChange();
-            this._checkAmountLimit();
+          window._activeCameraStream.getTracks().forEach(t => t.stop());
+        } catch (e) {}
+        window._activeCameraStream = null;
+      }
+      const camBox = document.getElementById('camera-modal-container');
+      if (camBox) camBox.style.display = 'none';
+    };
 
-            if (typeof toast === 'function') {
-              let missingFields = [];
-              if (!data.provider || data.provider === 'Estabelecimento Comercial') missingFields.push("fornecedor");
-              if (!data.date) missingFields.push("data de emissão");
-              if (!data.amount || data.amount <= 0) missingFields.push("valor total");
+    const processReceipt = async (file) => {
+      if (!file) return;
+      stopCamera();
 
-              if (missingFields.length > 0) {
-                let missingStr = missingFields.join(", ");
-                toast(`Não foi possível identificar os dados do documento enviado (${missingStr}), favor inserir manualmente.`, 'warning');
-              } else {
-                toast('Dados do comprovante lidos com sucesso!', 'success');
+      const loader = document.getElementById('ocr-loading');
+      if (loader) loader.style.display = 'block';
+
+      try {
+        const compressed = await this.compressImageIfNeeded(file);
+        this._selectedReceiptFile = compressed;
+
+        const pBox = document.getElementById('receipt-preview-box');
+        const pThumb = document.getElementById('receipt-thumb');
+        const pPdf = document.getElementById('receipt-pdf-icon');
+        const pName = document.getElementById('receipt-filename');
+        const pSize = document.getElementById('receipt-filesize');
+        const pBadge = document.getElementById('receipt-status-badge');
+
+        if (pBox && pName && pSize) {
+          pName.textContent = compressed.name;
+          const sizeKb = Math.round(compressed.size / 1024);
+          pSize.textContent = `${sizeKb} KB (otimizado)`;
+
+          if (compressed.type === 'application/pdf') {
+            if (pThumb) pThumb.style.display = 'none';
+            if (pPdf) pPdf.style.display = 'inline-block';
+          } else {
+            if (pPdf) pPdf.style.display = 'none';
+            if (pThumb) {
+              pThumb.src = URL.createObjectURL(compressed);
+              pThumb.style.display = 'block';
+            }
+          }
+          pBox.style.display = 'flex';
+          if (pBadge) pBadge.style.display = 'inline-block';
+        }
+
+        // Processamento OCR em background
+        const formData = new FormData();
+        formData.append('file', compressed);
+        const res = await fetch('/api/expenses/ocr', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + Api.getToken() },
+          body: formData
+        });
+        if (res.ok) {
+          const data = await res.json();
+          let countExtracted = 0;
+          if (data.provider) {
+            document.getElementById('ef-provider').value = data.provider;
+            if (data.provider !== 'Estabelecimento Comercial') countExtracted++;
+          }
+          if (data.date) {
+            document.getElementById('ef-date').value = data.date;
+            countExtracted++;
+          }
+          if (data.amount && data.amount > 0) {
+            const strVal = data.amount.toFixed(2).replace('.', ',');
+            document.getElementById('ef-amount').value = 'R$ ' + strVal;
+            countExtracted++;
+          }
+          if (data.category_suggestion) {
+            const sel = document.getElementById('ef-category');
+            for (let i = 0; i < sel.options.length; i++) {
+              if (sel.options[i].text.toLowerCase().includes(data.category_suggestion.toLowerCase())) {
+                sel.selectedIndex = i;
+                break;
               }
             }
           }
-        } catch (err) {
-          console.warn('Erro ao processar OCR:', err);
-        } finally {
-          if (loader) loader.style.display = 'none';
+          this._onCategoryChange();
+          this._checkAmountLimit();
+
+          if (typeof toast === 'function') {
+            let missingFields = [];
+            if (!data.provider || data.provider === 'Estabelecimento Comercial') missingFields.push("fornecedor");
+            if (!data.date) missingFields.push("data de emissão");
+            if (!data.amount || data.amount <= 0) missingFields.push("valor total");
+
+            if (missingFields.length > 0) {
+              let missingStr = missingFields.join(", ");
+              toast(`Não foi possível identificar os dados do documento enviado (${missingStr}), favor inserir manualmente.`, 'warning');
+            } else {
+              toast('Dados do comprovante lidos com sucesso!', 'success');
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao processar comprovante/OCR:', err);
+      } finally {
+        if (loader) loader.style.display = 'none';
+      }
+    };
+
+    // Botão Tirar Foto: prioriza câmera interna (evita que o Android mate o app em segundo plano)
+    const takePhotoBtn = document.getElementById('btn-take-photo');
+    if (takePhotoBtn) {
+      takePhotoBtn.addEventListener('click', async () => {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+            });
+            window._activeCameraStream = stream;
+            const video = document.getElementById('camera-video-preview');
+            const camBox = document.getElementById('camera-modal-container');
+            if (video && camBox) {
+              video.srcObject = stream;
+              camBox.style.display = 'block';
+              return;
+            }
+          } catch (e) {
+            console.warn('In-app camera not available, falling back to camera input:', e);
+          }
+        }
+        document.getElementById('ef-receipt-camera')?.click();
+      });
+    }
+
+    // Botão Capturar da câmera interna
+    const captureCamBtn = document.getElementById('btn-capture-camera');
+    if (captureCamBtn) {
+      captureCamBtn.addEventListener('click', () => {
+        const video = document.getElementById('camera-video-preview');
+        if (!video) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        stopCamera();
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], `foto_recibo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            processReceipt(file);
+          }
+        }, 'image/jpeg', 0.82);
+      });
+    }
+
+    const cancelCamBtn = document.getElementById('btn-cancel-camera');
+    if (cancelCamBtn) {
+      cancelCamBtn.addEventListener('click', stopCamera);
+    }
+
+    // Botão Escolher Arquivo / Galeria
+    const pickFileBtn = document.getElementById('btn-pick-file');
+    if (pickFileBtn) {
+      pickFileBtn.addEventListener('click', () => {
+        document.getElementById('ef-receipt-gallery')?.click();
+      });
+    }
+
+    const camInput = document.getElementById('ef-receipt-camera');
+    if (camInput) {
+      camInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          processReceipt(e.target.files[0]);
         }
       });
     }
+
+    const galleryInput = document.getElementById('ef-receipt-gallery');
+    if (galleryInput) {
+      galleryInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          processReceipt(e.target.files[0]);
+        }
+      });
+    }
+
+    // Botão Remover comprovante
+    const removeReceiptBtn = document.getElementById('btn-remove-receipt');
+    if (removeReceiptBtn) {
+      removeReceiptBtn.addEventListener('click', () => {
+        this._selectedReceiptFile = null;
+        const pBox = document.getElementById('receipt-preview-box');
+        const pBadge = document.getElementById('receipt-status-badge');
+        if (pBox) pBox.style.display = 'none';
+        if (pBadge) pBadge.style.display = 'none';
+        if (camInput) camInput.value = '';
+        if (galleryInput) galleryInput.value = '';
+      });
+    }
+  },
+
+  async compressImageIfNeeded(file) {
+    if (!file || file.type === 'application/pdf') return file;
+    if (file.type && !file.type.startsWith('image/')) return file;
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const maxDim = 1600;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const rawName = file.name || 'comprovante.jpg';
+            const cleanName = rawName.replace(/\.[^/.]+$/, "") + ".jpg";
+            const compressedFile = new File([blob], cleanName, { type: 'image/jpeg' });
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', 0.82);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      img.src = url;
+    });
   },
 
 
@@ -2324,6 +2542,21 @@ const ExpensesPage = {
           } catch(e) {
             console.warn('Erro ao atualizar comprovante de rota:', e);
           }
+        } else if (this._selectedReceiptFile) {
+          const receiptFile = this._selectedReceiptFile;
+          expense.receipt_path = receiptFile.name;
+          _saveDb();
+          const formData = new FormData();
+          formData.append('file', receiptFile);
+          try {
+            await fetch(`/api/expenses/${expense.id}/upload`, {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + Api.getToken() },
+              body: formData
+            });
+          } catch(e) {
+            console.warn('Erro ao atualizar anexo:', e);
+          }
         }
         if (expense && (expense.reverted_to_approval || expense.status === 'aguardando_aprovacao')) {
           toast('Despesa atualizada! Como estava aprovada, voltou para aprovação.', 'success');
@@ -2332,7 +2565,6 @@ const ExpensesPage = {
         }
       } else {
         expense = await Api.createExpense(body);
-        
 
         if (isKm) {
           try {
@@ -2353,7 +2585,7 @@ const ExpensesPage = {
             console.warn('Erro ao gerar comprovante de rota:', e);
           }
         } else {
-          const receiptFile = document.getElementById('ef-receipt')?.files?.[0];
+          const receiptFile = this._selectedReceiptFile || document.getElementById('ef-receipt')?.files?.[0];
           if (receiptFile) {
             expense.receipt_path = receiptFile.name; 
             _saveDb();
@@ -2385,6 +2617,7 @@ const ExpensesPage = {
       errEl.textContent = err.message;
       errEl.classList.remove('hidden');
     } finally {
+      this._selectedReceiptFile = null;
       saveBtn.disabled = false;
       saveBtn.textContent = id ? '💾 Salvar' : '📤 Salvar e Submeter';
     }
