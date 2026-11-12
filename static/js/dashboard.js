@@ -76,6 +76,14 @@ const DashboardPage = {
             <span class="dash-quick-label">Carregar</span>
           </button>
 
+          <!-- Quilometragem: abre formulário com categoria km pré-selecionada e travada -->
+          <button id="dash-btn-km" title="Registrar despesa de quilometragem" onclick="DashboardPage._onQuilometragem()" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0;">
+            <div class="dash-quick-icon" style="color:var(--ml-pink,#e91e8c);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.333 8 14 8 14s8-8.667 8-14a8 8 0 0 0-8-8z"/></svg>
+            </div>
+            <span class="dash-quick-label">Quilometragem</span>
+          </button>
+
           <!-- Notificações -->
           <button id="dash-btn-notif" title="Notificações de despesas" onclick="DashboardPage._onNotificacoes()" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0;position:relative;">
             <div class="dash-quick-icon" id="dash-notif-icon" style="position:relative;">
@@ -91,14 +99,6 @@ const DashboardPage = {
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             </div>
             <span class="dash-quick-label">Políticas</span>
-          </button>
-
-          <!-- Quilometragem: abre formulário com categoria km pré-selecionada e travada -->
-          <button id="dash-btn-km" title="Registrar despesa de quilometragem" onclick="DashboardPage._onQuilometragem()" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0;">
-            <div class="dash-quick-icon" style="color:var(--ml-pink,#e91e8c);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.333 8 14 8 14s8-8.667 8-14a8 8 0 0 0-8-8z"/></svg>
-            </div>
-            <span class="dash-quick-label">Quilometragem</span>
           </button>
         </div>
       </div>
@@ -151,7 +151,7 @@ const DashboardPage = {
       <div class="card">
         <div class="card-header">
           <span class="card-title" id="dash-recent-title">🕒 Despesas Recentes</span>
-          <button class="btn btn-sm btn-secondary" onclick="navigate('expenses')">Ver todas →</button>
+          <button class="btn btn-sm btn-secondary" onclick="localStorage.setItem('ml_filter_expenses_tab', 'all'); if (typeof ExpensesPage !== 'undefined') ExpensesPage.currentTab = 'all'; navigate('expenses');">Ver todas →</button>
         </div>
         <div id="dash-recent"></div>
       </div>

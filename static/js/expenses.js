@@ -336,6 +336,7 @@ const ExpensesPage = {
         t.classList.remove('active');
       }
     });
+    this._updateTabFilterVisibility();
 
 
     // Bind events
@@ -372,6 +373,7 @@ const ExpensesPage = {
         tab.classList.add('active');
         this.currentTab = tab.dataset.tab;
         localStorage.setItem('ml_filter_expenses_tab', this.currentTab);
+        this._updateTabFilterVisibility();
         this.loadExpenses();
       });
     });
@@ -435,8 +437,18 @@ const ExpensesPage = {
       });
     }
 
-
+    this._updateTabFilterVisibility();
     this.loadExpenses();
+  },
+
+  _updateTabFilterVisibility() {
+    const filtersEl = document.getElementById('expense-filters');
+    if (!filtersEl) return;
+    if (this.currentTab === 'pending') {
+      filtersEl.classList.add('hide-on-mobile');
+    } else {
+      filtersEl.classList.remove('hide-on-mobile');
+    }
   },
 
 
@@ -539,6 +551,7 @@ const ExpensesPage = {
 
 
     try {
+      this._updateTabFilterVisibility();
       const isApproverOrAdmin = ['admin', 'financeiro', 'aprovador'].includes(App.user?.role);
       const scope = isApproverOrAdmin ? (this._currentScope || localStorage.getItem('active_scope') || 'personal') : 'personal';
       const userVal = document.getElementById('filter-user')?.value || '';
@@ -901,7 +914,7 @@ const ExpensesPage = {
 
     return `
       <tr data-id="${e.id}" class="expense-row">
-        ${isAdminOrFinance ? `<td class="col-check" style="width:36px;text-align:center;"><input type="checkbox" class="exp-checkbox" value="${e.id}" data-status="${e.status}" title="${checkboxTitle}" ${checkboxDisabled} ${isChecked ? 'checked' : ''} /></td>` : ''}
+        ${isAdminOrFinance ? `<td class="col-check hide-on-mobile" style="width:36px;text-align:center;"><input type="checkbox" class="exp-checkbox" value="${e.id}" data-status="${e.status}" title="${checkboxTitle}" ${checkboxDisabled} ${isChecked ? 'checked' : ''} /></td>` : ''}
         <td class="col-alerts" style="width:28px;padding:0 2px;text-align:center;">
           <div style="display:inline-flex;align-items:center;justify-content:center;gap:2px;">
             ${alertBadge}
@@ -934,13 +947,13 @@ const ExpensesPage = {
             ${canReject ? `
               <button class="action-btn danger" title="Recusar despesa" data-action="reject" data-id="${e.id}">✘</button>
             ` : ''}
-            ${canFinalize ? `<button class="action-btn" title="Finalizar despesa" data-action="finalize" data-id="${e.id}" style="color:var(--purple);">🏁</button>` : ''}
+            ${canFinalize ? `<button class="action-btn hide-on-mobile" title="Finalizar despesa" data-action="finalize" data-id="${e.id}" style="color:var(--purple);">🏁</button>` : ''}
             ${(isAdminOrFinance && (e.status === 'finalizado' || e.status === 'aprovado' || e.status === 'aguardando_finalizacao') && !e.sienge_title) ? `
-              <button class="action-btn" title="Gerar Título no Sienge" data-action="send-sienge" data-id="${e.id}" style="color:#006633;">
+              <button class="action-btn hide-on-mobile" title="Gerar Título no Sienge" data-action="send-sienge" data-id="${e.id}" style="color:#006633;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
               </button>
             ` : ''}
-            ${canResubmit ? `<button class="action-btn" title="Reenviar" data-action="resubmit" data-id="${e.id}" style="color:var(--amber);">↩</button>` : ''}
+            ${canResubmit ? `<button class="action-btn hide-on-mobile" title="Reenviar" data-action="resubmit" data-id="${e.id}" style="color:var(--amber);">↩</button>` : ''}
             ${canEdit ? `<button class="action-btn" title="Editar despesa" data-action="edit" data-id="${e.id}"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ml-indigo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>` : ''}
             ${canDelete ? `
               <button class="action-btn danger" title="Excluir despesa" data-action="delete" data-id="${e.id}">

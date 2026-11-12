@@ -1538,14 +1538,14 @@ tbody td {
 
   #expenses-table tbody tr.expense-row {
     display: grid !important;
-    grid-template-columns: auto 1fr auto !important;
+    grid-template-columns: 1fr auto !important;
     grid-template-areas:
-      "check status date"
-      "user  user   amount"
-      "cat   cat    cat"
-      "cc    cc     cc"
-      "desc  desc   desc"
-      "act   act    act" !important;
+      "status date"
+      "user   amount"
+      "cat    cat"
+      "cc     cc"
+      "desc   desc"
+      "act    act" !important;
     grid-gap: 8px 10px !important;
     align-items: center !important;
     background: #ffffff !important;
@@ -1564,13 +1564,7 @@ tbody td {
   }
 
   #expenses-table tr.expense-row .col-check {
-    grid-area: check;
-    display: flex !important;
-    align-items: center;
-  }
-  #expenses-table tr.expense-row .col-check input {
-    width: 18px;
-    height: 18px;
+    display: none !important;
   }
 
   #expenses-table tr.expense-row .col-alerts {
@@ -1648,6 +1642,13 @@ tbody td {
     height: 36px !important;
     font-size: 16px !important;
     border-radius: 8px !important;
+  }
+
+  /* No app, apenas visualizar, aprovar, rejeitar, editar e excluir */
+  #expenses-table .td-actions [data-action="send-sienge"],
+  #expenses-table .td-actions [data-action="finalize"],
+  #expenses-table .td-actions [data-action="resubmit"] {
+    display: none !important;
   }
 
   .hide-on-mobile {
