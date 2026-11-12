@@ -118,25 +118,13 @@ const ExpensesPage = {
   switchScope(scope) {
     this._currentScope = scope;
     localStorage.setItem('active_scope', scope);
-    if (scope === 'personal') {
-      const uSel = document.getElementById('filter-user');
-      if (uSel) uSel.value = '';
-    }
     const tabPers = document.getElementById('exp-scope-personal');
     const tabTeam = document.getElementById('exp-scope-team');
     if (tabPers && tabTeam) {
       tabPers.classList.toggle('active', scope === 'personal');
       tabTeam.classList.toggle('active', scope !== 'personal');
     }
-    this._applyScopeUserVisibility();
     this.loadExpenses();
-  },
-
-  _applyScopeUserVisibility() {
-    const uSel = document.getElementById('filter-user');
-    if (uSel) {
-      uSel.style.display = this._currentScope === 'personal' ? 'none' : '';
-    }
   },
 
   async render() {
@@ -203,7 +191,7 @@ const ExpensesPage = {
             <span class="search-icon">🔍</span>
             <input type="text" class="search-input" id="exp-search" placeholder="Buscar despesa..." />
           </div>
-          ${isAdminOrFinance ? `
+          ${(isAdminOrFinance || App.user?.role === 'aprovador') ? `
           <select class="filter-select" id="filter-user">
             <option value="">Todos os usuários</option>
           </select>` : ''}
@@ -318,7 +306,6 @@ const ExpensesPage = {
 
     // Load aux data
     await this._loadAux();
-    this._applyScopeUserVisibility();
 
 
     // Restore filters from localStorage
@@ -1529,7 +1516,7 @@ const ExpensesPage = {
       <div id="km-block" style="display:none;margin-top:12px;">
         <div class="form-grid">
           <div class="field required span-2">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
               <label for="km-origin" style="margin:0;">📍 Ponto Inicial</label>
               <button class="btn btn-ghost btn-sm" type="button" id="btn-locate-origin" style="padding: 2px 6px; font-size: 12px; font-weight: 600; color: var(--ml-indigo); display: flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 4px; background: white; cursor: pointer; transition: 0.2s;">
                 📍 Localizar minha posição
@@ -1615,7 +1602,7 @@ const ExpensesPage = {
 
     const footer = `
       <button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
-      ${!id ? `<button class="btn btn-secondary" id="save-draft-btn">💾 Salvar Rascunho</button>` : ''}
+      ${!id ? `<button class="btn btn-secondary hide-on-mobile" id="save-draft-btn">💾 Salvar Rascunho</button>` : ''}
       <button class="btn btn-primary" id="save-submit-btn">${id ? '💾 Salvar' : '📤 Salvar e Submeter'}</button>
     `;
 
@@ -1752,7 +1739,7 @@ const ExpensesPage = {
 
     // Draft save
     if (!id) {
-      document.getElementById('save-draft-btn').addEventListener('click', () => this._saveExpense(null, false));
+      document.getElementById('save-draft-btn')?.addEventListener('click', () => this._saveExpense(null, false));
     }
     document.getElementById('save-submit-btn').addEventListener('click', () => this._saveExpense(id, true));
 

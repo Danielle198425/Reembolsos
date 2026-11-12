@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/style.css?v=64" />
+  <link rel="stylesheet" href="/static/css/style.css?v=65" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
@@ -163,6 +163,30 @@ window.fillLogin = fillLogin;
     <div id="page-payment-calendar" class="page hidden"></div>
     <div id="page-admin" class="page hidden"></div>
   </main>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav id="mobile-bottom-nav" class="mobile-bottom-nav">
+    <a href="#dashboard" class="mobile-nav-item active" data-page="dashboard">
+      <span class="mobile-nav-icon">🏠</span>
+      <span class="mobile-nav-label">Início</span>
+    </a>
+    <a href="#expenses" class="mobile-nav-item" data-page="expenses">
+      <span class="mobile-nav-icon">📋</span>
+      <span class="mobile-nav-label">Despesas</span>
+    </a>
+    <a href="#exports" class="mobile-nav-item" data-page="exports">
+      <span class="mobile-nav-icon">📤</span>
+      <span class="mobile-nav-label">Exportar</span>
+    </a>
+    <a href="#payment-calendar" class="mobile-nav-item admin-or-finance-only hidden" id="mobile-nav-payment-calendar" data-page="payment-calendar">
+      <span class="mobile-nav-icon">📅</span>
+      <span class="mobile-nav-label">Datas</span>
+    </a>
+    <a href="#admin" class="mobile-nav-item admin-only hidden" id="mobile-nav-admin" data-page="admin">
+      <span class="mobile-nav-icon">⚙️</span>
+      <span class="mobile-nav-label">Adm</span>
+    </a>
+  </nav>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
@@ -195,11 +219,11 @@ window.fillLogin = fillLogin;
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/static/js/api.js?v=68"></script>
-<script src="/static/js/dashboard.js?v=63"></script>
-<script src="/static/js/expenses.js?v=69"></script>
+<script src="/static/js/dashboard.js?v=64"></script>
+<script src="/static/js/expenses.js?v=70"></script>
 <script src="/static/js/exports.js?v=64"></script>
 <script src="/static/js/payment_calendar.js?v=62"></script>
 <script src="/static/js/admin.js?v=78"></script>
-<script src="/static/js/app.js?v=64"></script>
+<script src="/static/js/app.js?v=65"></script>
 </body>
 </html>

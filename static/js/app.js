@@ -198,20 +198,7 @@ overlayEl.addEventListener('click', (e) => {
 const pages = ['dashboard', 'expenses', 'transactions', 'exports', 'payment-calendar', 'smartaudit', 'admin'];
 
 function getRequestedPage() {
-  // 1. Pathname da URL (ex: /expenses, /admin, /exports, /payment-calendar, /dashboard)
-  const path = (window.location.pathname || '').replace(/^\/+/, '').trim();
-  if (path) {
-    const parts = path.split('/').filter(Boolean);
-    const candidate = parts[0].toLowerCase();
-    if (pages.includes(candidate)) {
-      if (candidate === 'admin' && parts[1]) {
-        localStorage.setItem('ml_admin_current_section', parts[1]);
-      }
-      return candidate;
-    }
-  }
-
-  // 2. Hash da URL (ex: #expenses, #admin, #payment-calendar)
+  // 1. Hash da URL (ex: #expenses, #admin, #payment-calendar)
   const hash = (window.location.hash || '').replace(/^#\/?/, '').trim();
   if (hash) {
     const parts = hash.split('/').filter(Boolean);
@@ -224,12 +211,20 @@ function getRequestedPage() {
     }
   }
 
-  // 3. Página salva no localStorage antes de atualizar (F5)
-  const saved = localStorage.getItem('ml_current_page');
-  if (saved && pages.includes(saved)) {
-    return saved;
+  // 2. Pathname da URL (ex: /expenses, /admin, /exports, /payment-calendar)
+  const path = (window.location.pathname || '').replace(/^\/+/, '').trim();
+  if (path && path !== 'index.html') {
+    const parts = path.split('/').filter(Boolean);
+    const candidate = parts[0].toLowerCase();
+    if (pages.includes(candidate)) {
+      if (candidate === 'admin' && parts[1]) {
+        localStorage.setItem('ml_admin_current_section', parts[1]);
+      }
+      return candidate;
+    }
   }
 
+  // 3. Padrão ao iniciar o app: Tela Inicial (Dashboard)
   return 'dashboard';
 }
 
@@ -259,6 +254,10 @@ function navigate(page, updateHistory = true) {
     const pageEl = document.getElementById(`page-${p}`);
     if (pageEl) pageEl.classList.add('hidden');
     document.getElementById(`nav-${p}`)?.classList.remove('active');
+  });
+
+  document.querySelectorAll('.mobile-nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === page);
   });
 
   const activePageEl = document.getElementById(`page-${page}`);
@@ -341,15 +340,19 @@ function showApp(user) {
   }
 
   if (['admin', 'financeiro'].includes(user.role)) {
-    document.getElementById('nav-admin').classList.remove('hidden');
+    document.getElementById('nav-admin')?.classList.remove('hidden');
+    document.getElementById('mobile-nav-admin')?.classList.remove('hidden');
   } else {
-    document.getElementById('nav-admin').classList.add('hidden');
+    document.getElementById('nav-admin')?.classList.add('hidden');
+    document.getElementById('mobile-nav-admin')?.classList.add('hidden');
   }
 
   if (['admin', 'financeiro'].includes(user.role)) {
     document.getElementById('nav-payment-calendar')?.classList.remove('hidden');
+    document.getElementById('mobile-nav-payment-calendar')?.classList.remove('hidden');
   } else {
     document.getElementById('nav-payment-calendar')?.classList.add('hidden');
+    document.getElementById('mobile-nav-payment-calendar')?.classList.add('hidden');
   }
 
   // Navigate to requested page (redirect if non-admin on admin route)
@@ -498,7 +501,7 @@ document.getElementById('collapse-btn').addEventListener('click', () => {
 });
 
 // Nav click
-document.querySelectorAll('.nav-item[data-page]').forEach(el => {
+document.querySelectorAll('.nav-item[data-page], .mobile-nav-item[data-page]').forEach(el => {
   el.addEventListener('click', (e) => {
     e.preventDefault();
     navigate(el.dataset.page);

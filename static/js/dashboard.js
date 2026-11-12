@@ -536,15 +536,16 @@ const DashboardPage = {
       return;
     }
     el.innerHTML = `
-      <table>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;">
+      <table id="dash-recent-table">
         <thead>
           <tr>
             <th>Status</th>
             <th>Data</th>
-            <th>Usu\u00e1rio</th>
+            <th>Usuário</th>
             <th>Valor</th>
             <th>Categoria</th>
-            <th>Descri\u00e7\u00e3o</th>
+            <th>Descrição</th>
           </tr>
         </thead>
         <tbody>
@@ -566,15 +567,16 @@ const DashboardPage = {
             }
             return `
             <tr style="cursor:pointer;" onclick="navigate('expenses')">
-              <td>${statusBadge(e.status)}</td>
-              <td>${fmtDate(e.expense_date)}</td>
-              <td>${escHtml(e.user_name)}</td>
-              <td class="amount-cell">${fmt(e.amount)}</td>
-              <td>${escHtml(e.category_name)}</td>
-              <td class="expense-description" title="${escHtml(e.description || desc)}">${escHtml(desc)}</td>
+              <td class="col-dash-status">${statusBadge(e.status)}</td>
+              <td class="col-dash-date">${fmtDate(e.expense_date)}</td>
+              <td class="col-dash-user">${escHtml(e.user_name)}</td>
+              <td class="col-dash-amount amount-cell">${fmt(e.amount)}</td>
+              <td class="col-dash-cat">${escHtml(e.category_name)}</td>
+              <td class="col-dash-desc expense-description" title="${escHtml(e.description || desc)}">${escHtml(desc)}</td>
             </tr>`;
           }).join('')}
         </tbody>
-      </table>`;
+      </table>
+      </div>`;
   },
 };
