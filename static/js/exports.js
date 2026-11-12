@@ -56,7 +56,7 @@ const ExportsPage = {
       <div id="exports-content">
         <div class="table-wrapper">
           <div class="filters-bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <div class="search-wrapper" style="flex:1;min-width:200px;">
+            <div class="search-wrapper" style="flex:1;">
               <span class="search-icon">🔍</span>
               <input type="text" class="search-input" id="export-search" placeholder="Buscar relatório..." />
             </div>
@@ -64,10 +64,10 @@ const ExportsPage = {
             <button class="btn btn-sm btn-primary" id="btn-bulk-email-export" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:7px 14px;font-size:13px;border-radius:8px;background:var(--ml-indigo);border-color:var(--ml-indigo);color:white;cursor:pointer;">
               📧 Enviar e-mail em massa
             </button>` : ''}
-            <select class="filter-select" id="select-report-filter" style="min-width:240px;">
+            <select class="filter-select" id="select-report-filter">
               <option value="">Todos os relatórios...</option>
             </select>
-            <select class="filter-select" id="select-email-status-filter" style="min-width:180px;">
+            <select class="filter-select" id="select-email-status-filter">
               <option value="">Todos os status...</option>
               <option value="a_enviar">A enviar</option>
               <option value="enviados">Já enviados</option>
@@ -205,9 +205,9 @@ const ExportsPage = {
     }
 
     tbody.innerHTML = items.map(ex => `
-      <tr>
-        ${isAdminOrFinance ? `<td><input type="checkbox" value="${ex.id}" /></td>` : ''}
-        <td>
+      <tr class="export-row" data-id="${ex.id}">
+        ${isAdminOrFinance ? `<td class="col-exp-check"><input type="checkbox" value="${ex.id}" /></td>` : ''}
+        <td class="col-exp-name">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:20px;">📄</span>
             <div>
@@ -216,25 +216,25 @@ const ExportsPage = {
             </div>
           </div>
         </td>
-        <td>
+        <td class="col-exp-creator">
           <div style="display:flex;align-items:center;gap:8px;">
             <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--ml-indigo),var(--ml-lilac));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;">${initials(ex.creator_name)}</div>
             <span style="font-size:13px;">${escHtml(ex.creator_name)}</span>
           </div>
         </td>
-        <td>
+        <td class="col-exp-type">
           <div>
             <div style="font-weight:600;font-size:13px;">${escHtml(ex.export_type || 'Padrão')}</div>
           </div>
         </td>
-        <td style="font-size:13px;color:var(--text-3);">${fmtDate(ex.created_at)}</td>
-        <td>
+        <td class="col-exp-date" style="font-size:13px;color:var(--text-3);">${fmtDate(ex.created_at)}</td>
+        <td class="col-exp-download">
           <a href="${Api.exportDownloadUrl(ex.id)}" target="_blank" class="btn btn-sm btn-secondary" style="display:inline-flex;align-items:center;gap:4px;">
             📄 Baixar PDF
           </a>
         </td>
         ${isAdminOrFinance ? `
-        <td>
+        <td class="col-exp-actions">
           ${ex.email_sent ? `
             <button class="btn-icon text-success" title="Relatório enviado" style="margin-right:6px;font-size:16px;cursor:pointer;background:none;border:none;color:#10b981;font-weight:bold;" onclick="ExportsPage.sendReportEmail(${ex.id})">📧<span style="font-size:10px;vertical-align:top;margin-left:1px;color:#10b981;font-weight:bold;">✓</span></button>
           ` : `

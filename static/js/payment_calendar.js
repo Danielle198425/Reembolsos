@@ -20,7 +20,7 @@ const PaymentCalendarPage = {
         </div>
       </div>
 
-      <div class="card" style="margin-bottom: 24px; max-width: 600px;">
+      <div class="card" id="sched-form-card" style="margin-bottom: 24px; max-width: 600px;">
         <div class="card-title" style="margin-bottom:18px; font-size:16px; font-weight:700;">
           📅 Agendar datas
         </div>
@@ -189,35 +189,35 @@ const PaymentCalendarPage = {
       }
 
       tbody.innerHTML = this.schedules.map(s => `
-        <tr>
-          <td style="padding:12px 14px; white-space:nowrap;">
+        <tr class="sched-row">
+          <td class="col-sched-month" style="padding:12px 14px; white-space:nowrap;">
             <div style="font-weight:700;font-size:14px;color:var(--text-1);">
               ${monthNames[s.month] || s.month} / ${s.year}
             </div>
           </td>
-          <td style="padding:12px 14px; white-space:nowrap;">
+          <td class="col-sched-pay" style="padding:12px 14px; white-space:nowrap;">
             <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--ml-indigo);background:var(--ml-light);padding:5px 12px;border-radius:12px;">
               🗓️ ${fmtDate(s.payment_date)}
             </span>
           </td>
-          <td style="padding:12px 14px; white-space:nowrap;">
+          <td class="col-sched-app" style="padding:12px 14px; white-space:nowrap;">
             ${s.approval_date ? `
               <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:#0e7490;background:#ecfeff;padding:5px 12px;border-radius:12px;border:1px solid #cffafe;">
                 ✅ ${fmtDate(s.approval_date)}
               </span>
             ` : `<span style="color:var(--text-3);font-size:13px;">—</span>`}
           </td>
-          <td style="padding:12px 14px; white-space:nowrap;">
+          <td class="col-sched-close" style="padding:12px 14px; white-space:nowrap;">
             ${s.closing_date ? `
               <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:#b45309;background:#fef3c7;padding:5px 12px;border-radius:12px;border:1px solid #fde68a;">
                 ⏰ ${fmtDate(s.closing_date)}
               </span>
             ` : `<span style="color:var(--text-3);font-size:13px;">—</span>`}
           </td>
-          <td style="padding:12px 14px; color:var(--text-2); font-size:13px;">
+          <td class="col-sched-creator" style="padding:12px 14px; color:var(--text-2); font-size:13px;">
             ${escHtml(s.creator_name || '-')}
           </td>
-          <td style="padding:12px 14px; color:var(--text-3); font-size:13px; white-space:nowrap;">
+          <td class="col-sched-created" style="padding:12px 14px; color:var(--text-3); font-size:13px; white-space:nowrap;">
             ${fmtDate(s.created_at)}
           </td>
         </tr>
