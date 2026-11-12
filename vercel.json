@@ -1,4 +1,20 @@
 {
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Content-Type", "value": "application/javascript; charset=utf-8" }
+      ]
+    },
+    {
+      "source": "/static/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -13,7 +29,7 @@
       "destination": "/api/index.py?__path=exports/$1"
     },
     {
-      "source": "/((?!api/|uploads/|exports/|static/).*)",
+      "source": "/((?!api/|uploads/|exports/|static/|sw\\.js).*)",
       "destination": "/index.html"
     }
   ]

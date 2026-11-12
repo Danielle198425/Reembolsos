@@ -375,6 +375,18 @@ async def serve_export(file_path: str, request: Request):
     return JSONResponse({"detail": "Não encontrado"}, status_code=404)
 
 
+@app.get("/sw.js", include_in_schema=False)
+async def serve_sw():
+    sw_path = "sw.js" if os.path.exists("sw.js") else "static/sw.js"
+    if os.path.exists(sw_path):
+        return FileResponse(
+            sw_path,
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"},
+        )
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
+
+
 @app.get("/", include_in_schema=False)
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_spa(request: Request, full_path: str = ""):

@@ -524,22 +524,28 @@ document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
   document.getElementById('pwa-banner').classList.add('hidden');
 });
 
+(() => {
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isIos && !isStandalone && !localStorage.getItem('ml_pwa_dismissed')) {
+    const banner = document.getElementById('pwa-banner');
+    const textEl = document.getElementById('pwa-banner-text');
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (textEl) textEl.textContent = "📱 No iPhone: toque em Compartilhar e 'Adicionar à Tela de Início'";
+    if (installBtn) installBtn.classList.add('hidden');
+    if (banner) banner.classList.remove('hidden');
+  }
+})();
+
 // ══════════════════════════════════════════════════════════════════════════════
-// SERVICE WORKER & CACHE PURGE
+// SERVICE WORKER (NETWORK-FIRST PWA)
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    for (const registration of registrations) {
-      registration.unregister().then(() => {
-        console.log('SW unregistered');
-      });
-    }
-  });
-}
-if ('caches' in window) {
-  caches.keys().then(names => {
-    for (const name of names) {
-      caches.delete(name);
-    }
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then((reg) => {
+        reg.update().catch(() => {});
+      })
+      .catch((err) => console.warn('SW register failed:', err));
   });
 }
 

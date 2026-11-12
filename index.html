@@ -6,6 +6,10 @@
   <title>Moura Leite — Sistema de Reembolsos</title>
   <meta name="description" content="Sistema de gestão de reembolsos corporativos da Moura Leite" />
   <meta name="theme-color" content="#1E1B4B" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ML Reembolsos" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/static/manifest.json" />
   <link rel="icon" type="image/svg+xml" href="/static/icons/logo-icon.svg" />
   <link rel="shortcut icon" href="/static/icons/logo-icon.png" />
@@ -184,7 +188,7 @@ window.fillLogin = fillLogin;
      PWA INSTALL BANNER
 ════════════════════════════════════════════════════════════════════════════ -->
 <div id="pwa-banner" class="pwa-banner hidden">
-  <span>📱 Instale o app para acesso offline</span>
+  <span id="pwa-banner-text">📱 Instale o aplicativo no seu celular</span>
   <button id="pwa-install-btn" class="btn btn-sm btn-white">Instalar</button>
   <button id="pwa-dismiss-btn" class="btn btn-sm btn-ghost">✕</button>
 </div>
