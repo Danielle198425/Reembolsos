@@ -330,12 +330,12 @@ def sync_financial_plans():
 
 @router.get("/departments")
 def get_departments(limit: int = 200, offset: int = 0):
-    url = f"{BASE_URL}/departments?limit={limit}&offset={offset}"
-    req = urllib.request.Request(url)
-    req.add_header('Authorization', _get_auth_header())
-    req.add_header('Accept', 'application/json')
     try:
-        with urllib.request.urlopen(req) as response:
+        url = f"{BASE_URL}/departments?limit={limit}&offset={offset}"
+        req = urllib.request.Request(url)
+        req.add_header('Authorization', _get_auth_header())
+        req.add_header('Accept', 'application/json')
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read())
             results = data.get("results", []) if isinstance(data, dict) else data
             formatted = []
@@ -351,10 +351,28 @@ def get_departments(limit: int = 200, offset: int = 0):
                     "active": True
                 })
             return formatted
-    except urllib.error.HTTPError as e:
-        raise HTTPException(status_code=e.code, detail=f"Erro da API Sienge: {e.read().decode(errors='ignore')}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        dept_file = os.path.join("static", "data", "departments.json")
+        if os.path.exists(dept_file):
+            try:
+                with open(dept_file, "r", encoding="utf-8") as f:
+                    depts = json.load(f)
+                formatted = []
+                for d in depts:
+                    raw_id = d.get("departmentId") or d.get("id")
+                    try:
+                        d_id = int(raw_id)
+                    except (ValueError, TypeError):
+                        d_id = str(raw_id or "")
+                    formatted.append({
+                        "id": d_id,
+                        "name": d.get("departmentName") or d.get("name", ""),
+                        "active": True
+                    })
+                return formatted
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail=f"Erro ao obter departamentos: {str(e)}")
 
 @router.post("/departments/sync")
 def sync_departments():
