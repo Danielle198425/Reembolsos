@@ -14,6 +14,7 @@ temp.txt
 .vercel/
 .vercel
 uploads/
+*.xlsx
 creditors.json
 static/data/creditors.json
 static/data/creditors.js
