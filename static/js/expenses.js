@@ -203,9 +203,9 @@ const ExpensesPage = {
             <option value="aguardando_aprovacao">Aguardando Aprovação</option>
             <option value="aprovado">Aprovado</option>
             <option value="rejeitado">Rejeitado</option>
-            <option value="aguardando_finalizacao">Aguardando Finalização</option>
-            <option value="finalizado">Finalizado</option>
-            <option value="enviado">Enviado</option>
+            <option value="aguardando_finalizacao">Aguardando Finalização do Financeiro</option>
+            <option value="finalizado">Finalizado pelo Financeiro</option>
+            <option value="enviado">Enviado para Pagamento</option>
             <option value="pago">Pago</option>
           </select>
           <select class="filter-select hide-on-mobile" id="filter-category">
@@ -1562,9 +1562,9 @@ const ExpensesPage = {
             <label for="km-notes">📝 Observação da Despesa *</label>
             <textarea id="km-notes" rows="2" placeholder="Informe a observação / motivo do deslocamento..." style="width:100%;" required>${escHtml(kmNotesVal)}</textarea>
           </div>
-          <div class="field span-2" style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <input type="checkbox" id="km-roundtrip" style="width:auto;margin:0;" ${roundTripVal ? 'checked' : ''} />
-            <label for="km-roundtrip" style="font-weight:600;margin:0;cursor:pointer;font-size:14px;color:var(--text-2);">🔄 Trajeto de ida e volta (dobrar valor)</label>
+          <div class="field span-2" style="display:flex;align-items:center;gap:10px;margin-top:10px;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e2e8f0;">
+            <input type="checkbox" id="km-roundtrip" style="width:18px!important;height:18px!important;min-width:18px;min-height:18px;margin:0!important;cursor:pointer;flex-shrink:0;" ${roundTripVal ? 'checked' : ''} />
+            <label for="km-roundtrip" style="font-weight:600;margin:0;cursor:pointer;font-size:13.5px;color:var(--text-1);line-height:1.3;">🔄 Trajeto de ida e volta (dobrar valor)</label>
           </div>
         </div>
 

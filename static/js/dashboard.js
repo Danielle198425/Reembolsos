@@ -115,7 +115,7 @@ const DashboardPage = {
             <span class="summary-item-value" id="dash-agu-apr">R$ 0,00</span>
           </div>
           <div class="summary-item">
-            <span class="summary-item-label">Aguardando Finalização ⓘ</span>
+            <span class="summary-item-label">Aguardando Finalização do Financeiro ⓘ</span>
             <span class="summary-item-value" id="dash-agu-fin">R$ 0,00</span>
           </div>
           <div class="summary-item">

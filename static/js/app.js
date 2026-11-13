@@ -60,9 +60,9 @@ const STATUS_LABELS = {
   aguardando_aprovacao: 'Aguardando Aprovação',
   aprovado: 'Aprovado',
   rejeitado: 'Rejeitado',
-  aguardando_finalizacao: 'Aguardando Finalização',
-  finalizado: 'Finalizado',
-  enviado: 'Enviado',
+  aguardando_finalizacao: 'Aguardando Finalização do Financeiro',
+  finalizado: 'Finalizado pelo Financeiro',
+  enviado: 'Enviado para Pagamento',
   pago: 'Pago',
 };
 

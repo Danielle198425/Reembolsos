@@ -1244,29 +1244,54 @@ tbody td {
 
 .flow-steps {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0;
   overflow-x: auto;
-  padding: 8px 0;
+  padding: 12px 6px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 .flow-step {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
+  width: 90px;
+  min-width: 90px;
+  text-align: center;
 }
 .flow-dot {
-  width: 12px; height: 12px;
+  width: 14px; height: 14px;
+  min-width: 14px; min-height: 14px;
   border-radius: 50%;
   background: var(--border-2);
+  z-index: 2;
+  margin-bottom: 2px;
 }
 .flow-dot.done { background: var(--green); }
 .flow-dot.current { background: var(--ml-indigo); box-shadow: 0 0 0 3px rgba(79,70,229,.25); }
 .flow-dot.rejected { background: var(--red); }
-.flow-step-label { font-size: 10px; color: var(--text-4); text-align: center; max-width: 70px; line-height: 1.2; }
+.flow-step-label {
+  font-size: 10.5px;
+  color: var(--text-4);
+  text-align: center;
+  width: 100%;
+  max-width: 88px;
+  line-height: 1.25;
+  white-space: normal;
+  word-break: normal;
+}
 .flow-step-label.active { color: var(--text-1); font-weight: 600; }
-.flow-line { flex: 1; height: 2px; background: var(--border); min-width: 20px; }
+.flow-line {
+  flex: 1 1 20px;
+  min-width: 16px;
+  height: 2px;
+  background: var(--border);
+  margin-top: 6px;
+  align-self: flex-start;
+  z-index: 1;
+}
 .flow-line.done { background: var(--green); }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1796,7 +1821,7 @@ tbody td {
     grid-column: auto !important;
     box-sizing: border-box !important;
   }
-  .form-grid .field input,
+  .form-grid .field input:not([type="checkbox"]):not([type="radio"]),
   .form-grid .field select,
   .form-grid .field textarea {
     width: 100% !important;
@@ -1804,6 +1829,21 @@ tbody td {
     box-sizing: border-box !important;
     font-size: 14px !important;
     height: 42px !important;
+  }
+  .form-grid .field input[type="checkbox"],
+  .form-grid .field input[type="radio"],
+  #km-roundtrip {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    min-height: 18px !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    cursor: pointer;
+    flex-shrink: 0 !important;
+    align-self: center !important;
   }
   .form-grid .field textarea {
     height: auto !important;
