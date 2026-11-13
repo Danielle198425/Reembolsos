@@ -91,11 +91,11 @@ def run_seed():
             db.commit()
 
 
-        # Garantir geração do arquivo PDF da Política em uploads
+        # Garantir geração do arquivo PDF da Política em static/docs
         import os, shutil
-        os.makedirs("uploads", exist_ok=True)
-        pdf_path = os.path.join("uploads", "Politica_reembolso_despesas.pdf")
-        alt_path = os.path.join("uploads", "Politica_reembolso_despesas (2).pdf")
+        os.makedirs(os.path.join("static", "docs"), exist_ok=True)
+        pdf_path = os.path.join("static", "docs", "Politica_reembolso_despesas.pdf")
+        alt_path = os.path.join("static", "docs", "Politica_reembolso_despesas (2).pdf")
         if not os.path.exists(pdf_path) or not os.path.exists(alt_path):
             try:
                 from reportlab.lib.pagesizes import letter

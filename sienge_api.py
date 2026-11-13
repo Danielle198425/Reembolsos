@@ -1,11 +1,14 @@
+import os
 import urllib.request
 import base64
 import json
 
 def fetch_creditors():
     url = "https://api.sienge.com.br/mouraleite/public/api/v1/creditors?limit=200&offset=0"
-    username = "mouraleite-contas-a-pagar"
-    password = "U2riBlrXuOPIpbb7TyRapoxSzaXWUisj"
+    username = os.environ.get("SIENGE_API_USER")
+    password = os.environ.get("SIENGE_API_PASSWORD")
+    if not username or not password:
+        raise RuntimeError("Variáveis de ambiente SIENGE_API_USER e SIENGE_API_PASSWORD são obrigatórias para acessar a API do Sienge.")
     
     auth_str = f"{username}:{password}"
     b64_auth = base64.b64encode(auth_str.encode('ascii')).decode('ascii')

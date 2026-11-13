@@ -861,7 +861,7 @@ const AdminPage = {
 
     try {
       const users = await Api.getUsers();
-      const ccs = await Api.getSiengeDepartments();
+      const ccs = await Api.getSiengeDepartments().catch(() => []);
       document.getElementById('users-tbody').innerHTML = users.map(u => `
         <tr data-status="${u.active !== false ? 'active' : 'inactive'}">
           <td>
@@ -920,7 +920,7 @@ const AdminPage = {
     }
 
     let user = null;
-    let ccs = await Api.getSiengeDepartments();
+    let ccs = await Api.getSiengeDepartments().catch(() => []);
     let jobRoles = await Api.getJobRoles();
     let jobFunctions = await Api.getJobFunctions();
 

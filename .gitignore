@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .env
+.env*
 *.db
 *.db.bak
 *.bak
@@ -11,6 +12,9 @@ exports/
 scratch/
 temp.txt
 .vercel/
-
 .vercel
-.env*
+uploads/
+*.xlsx
+creditors.json
+static/data/creditors.json
+static/data/creditors.js
