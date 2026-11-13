@@ -402,16 +402,31 @@ window.exitImpersonation = exitImpersonation;
 document.getElementById('impersonation-exit-btn')?.addEventListener('click', exitImpersonation);
 
 async function tryAutoLogin() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const urlToken = urlParams.get('token') || hashParams.get('token');
+  if (urlToken) {
+    Api.setToken(urlToken);
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (e) {}
+  }
+
   const token = Api.getToken();
   if (!token) { showLogin(); return; }
   try {
     const user = await Api.me();
     showApp(user);
-  } catch {
+  } catch (err) {
     Api.setToken(null);
     sessionStorage.removeItem('ml_impersonator_token');
     sessionStorage.removeItem('ml_impersonator_user');
     showLogin();
+    const errEl = document.getElementById('login-error');
+    if (errEl && err && err.message && !err.message.includes('401') && !err.message.includes('Credenciais')) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }
   }
 }
 

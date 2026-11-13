@@ -1,6 +1,7 @@
+import json
 from typing import Optional, List, Any
 from datetime import datetime, date
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from models import UserRole, ExpenseStatus
 
 
@@ -99,6 +100,20 @@ class UserBase(BaseModel):
     agency: Optional[str] = None
     account: Optional[str] = None
 
+    @field_validator('approver_of', 'approver_of_functions', 'approver_rules', 'groups', mode='before')
+    @classmethod
+    def parse_json_fields(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            try:
+                res = json.loads(v)
+                return res if isinstance(res, list) else []
+            except Exception:
+                return []
+        return v
+
 
 class UserCreate(UserBase):
     password: Optional[str] = "123456"
@@ -123,6 +138,20 @@ class UserUpdate(BaseModel):
     bank: Optional[str] = None
     agency: Optional[str] = None
     account: Optional[str] = None
+
+    @field_validator('approver_of', 'approver_of_functions', 'approver_rules', 'groups', mode='before')
+    @classmethod
+    def parse_json_fields(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            try:
+                res = json.loads(v)
+                return res if isinstance(res, list) else []
+            except Exception:
+                return []
+        return v
 
 
 class JobRoleBase(BaseModel):

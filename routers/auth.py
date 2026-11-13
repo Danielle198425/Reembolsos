@@ -91,7 +91,8 @@ def _render_auth_success(token: str) -> HTMLResponse:
         try {{
             localStorage.setItem('ml_token', '{token}');
             localStorage.setItem('token', '{token}');
-            window.location.replace('/');
+            sessionStorage.setItem('ml_token', '{token}');
+            window.location.replace('/?token={token}');
         }} catch(e) {{
             window.location.href = '/?token={token}';
         }}
@@ -328,29 +329,23 @@ def azure_callback(request: Request, db: Session = Depends(get_db)):
             f"Acesso negado para a conta '{user_email}'. Apenas e-mails corporativos @mouraleite.com.br são permitidos."
         )
 
-    # 5. Localizar ou provisionar usuário no banco de dados
+    # 5. Localizar usuário no banco de dados e verificar cadastro de credor
     user = db.query(models.User).filter(
         func.lower(models.User.email) == user_email
     ).first()
 
-    if not user:
-        # Primeiro login do colaborador: cria automaticamente com perfil padrão
-        user = models.User(
-            name=display_name or user_email.split("@")[0].title(),
-            email=user_email,
-            password_hash=auth.get_password_hash(secrets.token_urlsafe(32)),
-            role=models.UserRole.usuario,
-            active=True
+    # REQUISITO 2: Se o ID do usuário não tiver no cadastro do credor (cruze pelo e-mail),
+    # deve aparecer a mensagem: "Seu usuário não está cadastrado no sistema, solicite inclusão ao financeiro"
+    # e ele não visualiza o restante do sistema.
+    if not user or (not user.creditor_code and user.role != models.UserRole.admin) or not user.active or user.is_locked:
+        return _render_auth_error(
+            "Seu usuário não está cadastrado no sistema, solicite inclusão ao financeiro.",
+            status_code=403
         )
-        db.add(user)
+
+    if display_name and (not user.name or user.name == user.email):
+        user.name = display_name
         db.commit()
-        db.refresh(user)
-    else:
-        if not user.active or user.is_locked:
-            return _render_auth_error(f"O usuário '{user_email}' está inativo ou bloqueado no sistema. Contate o administrador.")
-        if display_name and (not user.name or user.name == user.email):
-            user.name = display_name
-            db.commit()
 
     # 6. Gerar token JWT da aplicação e autenticar
     app_token = auth.create_access_token({"sub": str(user.id)})
@@ -359,4 +354,9 @@ def azure_callback(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=schemas.UserOut)
 def get_me(current_user: models.User = Depends(auth.get_current_user)):
+    if not current_user.creditor_code and current_user.role != models.UserRole.admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Seu usuário não está cadastrado no sistema, solicite inclusão ao financeiro."
+        )
     return current_user
