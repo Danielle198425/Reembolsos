@@ -287,19 +287,25 @@ async def serve_upload(file_path: str):
     clean_name = urllib.parse.unquote(file_path).lstrip("/")
     raw_name = file_path.lstrip("/")
 
-    # 1. Checa em /tmp/uploads (disco de escrita no Vercel)
+    # 1. Checa em static/docs (documentos públicos como políticas de reembolso)
+    for candidate in (raw_name, clean_name):
+        doc_path = os.path.join("static", "docs", os.path.basename(candidate))
+        if os.path.isfile(doc_path):
+            return FileResponse(doc_path)
+
+    # 2. Checa em /tmp/uploads (disco de escrita no Vercel)
     for candidate in (raw_name, clean_name):
         tmp_path = os.path.join("/tmp/uploads", candidate)
         if os.path.isfile(tmp_path):
             return FileResponse(tmp_path)
 
-    # 2. Checa em uploads/ (arquivos empacotados com a aplicação)
+    # 3. Checa em uploads/ (arquivos locais)
     for candidate in (raw_name, clean_name):
         local_path = os.path.join("uploads", candidate)
         if os.path.isfile(local_path):
             return FileResponse(local_path)
 
-    # 3. Busca no Supabase Storage
+    # 4. Busca no Supabase Storage
     if storage.enabled():
         for candidate in (clean_name, raw_name):
             remote_path = f"uploads/{candidate}"

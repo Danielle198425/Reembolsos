@@ -91,8 +91,6 @@ from pdf_generator import generate_export_pdf
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.sienge.com.br/mouraleite/public/api/v1"
-USERNAME = "mouraleite-contas-a-pagar"
-PASSWORD = "U2riBlrXuOPIpbb7TyRapoxSzaXWUisj"
 
 MONTHS_PT = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
@@ -105,7 +103,11 @@ _cost_center_company_cache: Dict[str, int] = {}
 
 
 def get_auth_header() -> str:
-    auth_str = f"{USERNAME}:{PASSWORD}"
+    username = os.environ.get("SIENGE_API_USER")
+    password = os.environ.get("SIENGE_API_PASSWORD")
+    if not username or not password:
+        raise RuntimeError("Variáveis de ambiente SIENGE_API_USER e SIENGE_API_PASSWORD são obrigatórias para conectar ao Sienge.")
+    auth_str = f"{username}:{password}"
     b64_auth = base64.b64encode(auth_str.encode("ascii")).decode("ascii")
     return f"Basic {b64_auth}"
 

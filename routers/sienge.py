@@ -1,3 +1,4 @@
+import os
 import urllib.request
 import urllib.error
 import base64
@@ -10,11 +11,16 @@ import models, auth
 router = APIRouter(prefix="/api/sienge", tags=["sienge"])
 
 BASE_URL = "https://api.sienge.com.br/mouraleite/public/api/v1"
-USERNAME = "mouraleite-contas-a-pagar"
-PASSWORD = "U2riBlrXuOPIpbb7TyRapoxSzaXWUisj"
 
 def _get_auth_header():
-    auth_str = f"{USERNAME}:{PASSWORD}"
+    username = os.environ.get("SIENGE_API_USER")
+    password = os.environ.get("SIENGE_API_PASSWORD")
+    if not username or not password:
+        raise HTTPException(
+            status_code=500,
+            detail="Variáveis de ambiente SIENGE_API_USER e SIENGE_API_PASSWORD não configuradas no servidor."
+        )
+    auth_str = f"{username}:{password}"
     b64_auth = base64.b64encode(auth_str.encode('ascii')).decode('ascii')
     return f"Basic {b64_auth}"
 
