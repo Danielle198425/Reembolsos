@@ -194,8 +194,9 @@ def run_auto_migrations():
     try:
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM cost_centers WHERE code = '70131' OR (code = '70131' AND LOWER(name) LIKE '%vendas%');"))
+            conn.execute(text("UPDATE cost_centers SET active = true WHERE code = '14703';"))
     except Exception as e:
-        print(f"[migration] delete cost_center 70131: {e}")
+        print(f"[migration] cost_center cleanup: {e}")
 
 
 

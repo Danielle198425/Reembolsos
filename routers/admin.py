@@ -620,7 +620,7 @@ def delete_cost_center(
 def toggle_cost_center_status(
     code_or_id: str,
     active: bool = Body(..., embed=True),
-    current_user: models.User = Depends(auth.require_admin),
+    current_user: models.User = Depends(auth.require_admin_or_finance),
     db: Session = Depends(get_db)
 ):
     code_str = str(code_or_id).strip()
@@ -758,10 +758,11 @@ def toggle_company_status(
 # ─── CATEGORIES ──────────────────────────────────────────────────────────────
 @router.get("/categories")
 def list_categories(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
-    all_active_cats = db.query(models.Category).filter(models.Category.active == True).all()
-
+    # Para administradores e financeiro (gestão de categorias no painel admin), retorna todas as categorias (ativas e inativas)
     if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
-        return all_active_cats
+        return db.query(models.Category).order_by(models.Category.name).all()
+
+    all_active_cats = db.query(models.Category).filter(models.Category.active == True).all()
 
     cat_rules = db.query(models.CategoryRule).all()
     app_rules = db.query(models.ApportionmentRule).all()

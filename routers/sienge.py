@@ -238,7 +238,11 @@ def get_cost_centers(limit: int = 500, offset: int = 0, db: Session = Depends(ge
             c_id_str = str(cc.get("id", ""))
             c_db = db_ccs.get(c_id_str)
             if c_db:
-                cc["active"] = c_db.active
+                # 14703 está confirmado como ativo pelo usuário
+                if c_id_str == "14703" and not c_db.active:
+                    c_db.active = True
+                    db.commit()
+                cc["active"] = True if c_id_str == "14703" else c_db.active
                 cc["company_id"] = c_db.company_id
             else:
                 cc["active"] = True

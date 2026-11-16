@@ -3535,6 +3535,9 @@ const AdminPage = {
       // Purga cache de centros de custo inválidos/inexistentes (ex: 70131 - Vendas)
       if (window._db && Array.isArray(window._db.sienge_cost_centers)) {
         window._db.sienge_cost_centers = window._db.sienge_cost_centers.filter(c => String(c.id || c.code).trim() !== '70131');
+        // Garante que 14703 esteja ativo no cache local
+        const cc14703 = window._db.sienge_cost_centers.find(c => String(c.id || c.code).trim() === '14703');
+        if (cc14703) cc14703.active = true;
         _saveDb();
       }
 
@@ -3545,7 +3548,7 @@ const AdminPage = {
         if (codeStr === '70131' || idStr === '70131') return;
         if (c.name && c.name.trim().toLowerCase() === 'vendas' && codeStr === '70131') return;
         const key = codeStr || idStr;
-        ccMap.set(key, { id: c.id, code: c.code || String(c.id), name: c.name, active: c.active !== false });
+        ccMap.set(key, { id: c.id, code: c.code || String(c.id), name: c.name, active: (codeStr === '14703' || idStr === '14703') ? true : (c.active !== false) });
       });
 
       (siengeCcs || []).forEach(c => {
@@ -3557,8 +3560,9 @@ const AdminPage = {
         if (ccMap.has(key)) {
           const existing = ccMap.get(key);
           if (c.name) existing.name = c.name;
+          if (c.active !== undefined) existing.active = (key === '14703') ? true : (c.active !== false);
         } else {
-          ccMap.set(key, { id: c.id || c.code, code: c.code || String(c.id), name: c.name, active: c.active !== false });
+          ccMap.set(key, { id: c.id || c.code, code: c.code || String(c.id), name: c.name, active: (key === '14703') ? true : (c.active !== false) });
         }
       });
 
@@ -3568,13 +3572,26 @@ const AdminPage = {
         const idStr = String(lc.id || '').trim();
         if (codeStr === '70131' || idStr === '70131') return;
         const key = codeStr || idStr;
+        if (key === '14703') return;
         if (ccMap.has(key)) {
           ccMap.get(key).active = lc.active !== false;
         }
       });
 
+      // Garante presença e status ativo do centro 14703
+      if (ccMap.has('14703')) {
+        ccMap.get('14703').active = true;
+      } else {
+        ccMap.set('14703', {
+          id: '14703',
+          code: '14703',
+          name: 'TATUÍ - MIRANTE DOS RAMOS - COMERCIAL',
+          active: true
+        });
+      }
+
       const activeCcs = Array.from(ccMap.values())
-        .filter(c => c.active !== false && String(c.code || c.id).trim() !== '70131')
+        .filter(c => (c.code === '14703' || String(c.id) === '14703' || c.active !== false) && String(c.code || c.id).trim() !== '70131')
         .sort((a, b) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true }));
 
       const seenCcUserEmails = new Set();
@@ -3870,6 +3887,11 @@ const AdminPage = {
 
       // Nunca exibir centros descontinuados/inexistentes (ex: 70131 - Vendas)
       if (idKey === '70131' || codeKey === '70131') return false;
+
+      // Centro 14703 é garantido como ativo e disponível para seleção
+      if (idKey === '14703' || codeKey === '14703') {
+        return true;
+      }
 
       // Se pertencer à regra que está sendo editada, SEMPRE fica disponível para manter ou desmarcar
       if (editingCcKeys.has(idKey) || (codeKey && editingCcKeys.has(codeKey)) || (nameKey && editingCcKeys.has(nameKey))) {

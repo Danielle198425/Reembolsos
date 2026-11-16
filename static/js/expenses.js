@@ -1387,7 +1387,7 @@ const ExpensesPage = {
     }
 
 
-    const cats = this.categories || [];
+    const cats = (this.categories || []).filter(c => c && c.active !== false);
     const seenCodes = new Set();
     const ccs = (this.costCenters || []).filter(c => {
       const isActive = c && c.active !== false && c.active !== 0 && c.active !== 'false' && c.active !== '0';
