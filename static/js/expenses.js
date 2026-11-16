@@ -1835,29 +1835,68 @@ const ExpensesPage = {
           if (pBadge) pBadge.style.display = 'inline-block';
         }
 
-        // Processamento OCR em background
+        // Processamento OCR inteligente via Azure AI Document Intelligence
         const formData = new FormData();
         formData.append('file', compressed);
-        const res = await fetch('/api/expenses/ocr', {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + Api.getToken() },
-          body: formData
-        });
-        if (res.ok) {
-          const data = await res.json();
-          let countExtracted = 0;
-          if (data.provider) {
-            document.getElementById('ef-provider').value = data.provider;
-            if (data.provider !== 'Estabelecimento Comercial') countExtracted++;
+        let data = null;
+        try {
+          const res = await fetch('/api/expenses/scan-receipt', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + Api.getToken() },
+            body: formData
+          });
+          if (res.ok) {
+            data = await res.json();
+          } else {
+            console.warn('scan-receipt retornou status não-ok, tentando fallback /ocr...');
+            const fallbackRes = await fetch('/api/expenses/ocr', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + Api.getToken() },
+              body: formData
+            });
+            if (fallbackRes.ok) {
+              const fbData = await fallbackRes.json();
+              data = {
+                estabelecimento: fbData.provider,
+                data: fbData.date,
+                valorTotal: fbData.amount,
+                category_suggestion: fbData.category_suggestion
+              };
+            }
           }
-          if (data.date) {
-            document.getElementById('ef-date').value = data.date;
-            countExtracted++;
+        } catch (fetchErr) {
+          console.warn('Erro na requisição de leitura inteligente, tentando fallback local:', fetchErr);
+          try {
+            const fallbackRes = await fetch('/api/expenses/ocr', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + Api.getToken() },
+              body: formData
+            });
+            if (fallbackRes.ok) {
+              const fbData = await fallbackRes.json();
+              data = {
+                estabelecimento: fbData.provider,
+                data: fbData.date,
+                valorTotal: fbData.amount,
+                category_suggestion: fbData.category_suggestion
+              };
+            }
+          } catch (e) {}
+        }
+
+        if (data) {
+          const providerVal = data.estabelecimento || data.provider;
+          if (providerVal && providerVal !== 'Estabelecimento Comercial') {
+            document.getElementById('ef-provider').value = providerVal;
           }
-          if (data.amount && data.amount > 0) {
-            const strVal = data.amount.toFixed(2).replace('.', ',');
+          const dateVal = data.data || data.date;
+          if (dateVal) {
+            document.getElementById('ef-date').value = dateVal;
+          }
+          const amountVal = data.valorTotal !== undefined ? data.valorTotal : data.amount;
+          if (amountVal && amountVal > 0) {
+            const strVal = Number(amountVal).toFixed(2).replace('.', ',');
             document.getElementById('ef-amount').value = 'R$ ' + strVal;
-            countExtracted++;
           }
           if (data.category_suggestion) {
             const sel = document.getElementById('ef-category');
@@ -1873,15 +1912,15 @@ const ExpensesPage = {
 
           if (typeof toast === 'function') {
             let missingFields = [];
-            if (!data.provider || data.provider === 'Estabelecimento Comercial') missingFields.push("fornecedor");
-            if (!data.date) missingFields.push("data de emissão");
-            if (!data.amount || data.amount <= 0) missingFields.push("valor total");
+            if (!providerVal || providerVal === 'Estabelecimento Comercial') missingFields.push("estabelecimento");
+            if (!dateVal) missingFields.push("data");
+            if (!amountVal || amountVal <= 0) missingFields.push("valor total");
 
             if (missingFields.length > 0) {
               let missingStr = missingFields.join(", ");
-              toast(`Não foi possível identificar os dados do documento enviado (${missingStr}), favor inserir manualmente.`, 'warning');
+              toast(`Comprovante lido: campo(s) ${missingStr} não identificado(s) automaticamente, favor verificar e preencher.`, 'warning');
             } else {
-              toast('Dados do comprovante lidos com sucesso!', 'success');
+              toast('Comprovante lido com sucesso pelo Azure Document Intelligence!', 'success');
             }
           }
         }
@@ -1934,7 +1973,7 @@ const ExpensesPage = {
             const file = new File([blob], `foto_recibo_${Date.now()}.jpg`, { type: 'image/jpeg' });
             processReceipt(file);
           }
-        }, 'image/jpeg', 0.82);
+        }, 'image/jpeg', 0.85);
       });
     }
 
@@ -1993,7 +2032,7 @@ const ExpensesPage = {
       const url = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(url);
-        const maxDim = 1600;
+        const maxDim = 1920;
         let { width, height } = img;
         if (width > maxDim || height > maxDim) {
           if (width > height) {
@@ -2018,7 +2057,7 @@ const ExpensesPage = {
           } else {
             resolve(file);
           }
-        }, 'image/jpeg', 0.82);
+        }, 'image/jpeg', 0.85);
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);

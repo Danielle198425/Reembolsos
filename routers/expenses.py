@@ -862,6 +862,37 @@ def get_ocr_engine():
     return _ocr_engine if _ocr_engine is not False else None
 
 
+@router.post("/scan-receipt")
+async def scan_receipt(
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Leitura inteligente de recibos, cupons fiscais e comprovantes de pedágio via Azure AI Document Intelligence
+    utilizando o modelo pré-treinado 'prebuilt-receipt' e autenticação sem chave estática (DefaultAzureCredential).
+    Retorna:
+      - estabelecimento (MerchantName com fallback para MerchantAddress)
+      - data (TransactionDate formatada em YYYY-MM-DD)
+      - valorTotal (Total numérico)
+    """
+    try:
+        from services.azure_document_intelligence import analyze_receipt
+        file_bytes = await file.read()
+        if not file_bytes:
+            raise HTTPException(status_code=400, detail="Arquivo vazio enviado para leitura.")
+
+        data = analyze_receipt(file_bytes)
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro no scan do recibo com Azure Document Intelligence: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao processar o comprovante com Azure Document Intelligence: {str(e)}"
+        )
+
+
 @router.post("/ocr")
 async def extract_receipt_data(
     file: UploadFile = File(...),

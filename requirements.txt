@@ -13,4 +13,6 @@ python-dateutil==2.9.0
 pydantic[email]==2.7.1
 pypdf>=6.0.0
 requests>=2.31.0
+azure-ai-formrecognizer>=3.3.3
+azure-identity>=1.16.1
 
