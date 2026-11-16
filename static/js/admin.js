@@ -1056,119 +1056,142 @@ const AdminPage = {
     }, 50);
 
     document.getElementById('save-user-btn').addEventListener('click', async () => {
-      const errEl = document.getElementById('uf-error');
-      errEl.classList.add('hidden');
-      const name = document.getElementById('uf-name').value.trim();
-      const email = document.getElementById('uf-email').value.trim();
-      const jobRoleId = document.getElementById('uf-job-role').value;
-      const jobFunctionId = document.getElementById('uf-job-function').value;
-      const groupsVal = document.getElementById('uf-groups').value;
-      const groups = groupsVal ? [parseInt(groupsVal)] : [];
-      
-      const creditorCode = document.getElementById('uf-creditor').value.trim();
-      const select = document.getElementById('uf-job-role');
-      const selectedText = select.options[select.selectedIndex]?.text.toLowerCase() || '';
-      const isApprover = selectedText.includes('aprov');
-      const isAdmin = selectedText.includes('admin');
-
-      AdminPage.syncApproverRulesFromDom();
-      let approverRules = [];
-      let scopeDepartments = [];
-      let scopeFunctions = [];
-      
-      const funcSelect = document.getElementById('uf-job-function');
-      const funcText = funcSelect ? (funcSelect.options[funcSelect.selectedIndex]?.text.toLowerCase() || '') : '';
-      const isGestorOrDiretor = AdminPage.getFunctionRank(funcText) <= 2;
-
-      if (isApprover || isAdmin || isFinance) {
-        if (isAdmin || isFinance || (isApprover && isGestorOrDiretor)) {
-          approverRules = (AdminPage._approverRules || []).map(r => ({
-            function_ids: (r.function_ids || []).map(Number),
-            department_ids: (r.department_ids || []).map(Number)
-          })).filter(r => r.function_ids.length > 0 || r.department_ids.length > 0);
-        } else if (isApprover) {
-          const firstRule = (AdminPage._approverRules && AdminPage._approverRules[0]) || { function_ids: [] };
-          approverRules = [{
-            function_ids: (firstRule.function_ids || []).map(Number),
-            department_ids: groups
-          }];
-        }
-
-        if (isAdmin || isFinance || (isApprover && isGestorOrDiretor)) {
-          if (approverRules.length === 0) {
-            errEl.textContent = 'Adicione pelo menos uma regra de aprovação com Função e Departamento.';
-            errEl.classList.remove('hidden');
-            return;
-          }
-          for (let i = 0; i < approverRules.length; i++) {
-            const rule = approverRules[i];
-            if (!rule.function_ids || rule.function_ids.length === 0) {
-              errEl.textContent = `Selecione pelo menos uma Função na regra ${i + 1} de aprovação.`;
-              errEl.classList.remove('hidden');
-              return;
-            }
-            if (!rule.department_ids || rule.department_ids.length === 0) {
-              errEl.textContent = `Selecione pelo menos um Departamento na regra ${i + 1} de aprovação.`;
-              errEl.classList.remove('hidden');
-              return;
-            }
-          }
-        } else if (isApprover) {
-          if (approverRules.length === 0 || !approverRules[0].function_ids || approverRules[0].function_ids.length === 0) {
-            errEl.textContent = 'Selecione pelo menos uma Função para aprovação.';
-            errEl.classList.remove('hidden');
-            return;
-          }
-        }
-
-        scopeFunctions = Array.from(new Set(approverRules.flatMap(r => r.function_ids)));
-        scopeDepartments = Array.from(new Set(approverRules.flatMap(r => r.department_ids)));
-      }
-
-      const paymentMethod = document.getElementById('uf-payment').value;
-      const pixKey = document.getElementById('uf-pix').value.trim();
-      const bank = document.getElementById('uf-bank').value.trim();
-      const agency = document.getElementById('uf-agency').value.trim();
-      const account = document.getElementById('uf-account').value.trim();
-
-      if (!creditorCode || !name || !email || !paymentMethod || groups.length === 0 || !jobRoleId) {
-        errEl.textContent = 'Preencha os campos obrigatórios básicos (Código do credor, Nome, E-mail, Perfil, Departamento, Forma de Pagamento).';
-        errEl.classList.remove('hidden');
-        return;
-      }
-
-      const isBankPayment = ['TED', 'Depósito Itaú'].includes(paymentMethod);
-      const body = { 
-        creditor_code: creditorCode,
-        name, 
-        email, 
-        job_role_id: jobRoleId ? parseInt(jobRoleId) : null,
-        job_function_id: jobFunctionId ? parseInt(jobFunctionId) : null,
-        groups,
-        cost_center_id: groups.length > 0 ? groups[0] : null,
-        approver_of: scopeDepartments,
-        approver_of_functions: scopeFunctions,
-        approver_rules: approverRules,
-        payment_method: paymentMethod || null,
-        pix_key: paymentMethod === 'PIX' ? pixKey : null,
-        bank: isBankPayment ? bank : null,
-        agency: isBankPayment ? agency : null,
-        account: isBankPayment ? account : null
-      };
-      if (!id) body.active = true;
-
       const btn = document.getElementById('save-user-btn');
-      btn.disabled = true;
+      const errEl = document.getElementById('uf-error');
+      if (errEl) errEl.classList.add('hidden');
+
       try {
-        if (id) await Api.updateUser(id, body);
-        else await Api.createUser(body);
-        toast(id ? 'Usuário atualizado!' : 'Usuário criado!', 'success');
-        Modal.close();
-        this.renderUsers();
-      } catch (err) {
-        errEl.textContent = err.message;
-        errEl.classList.remove('hidden');
-        btn.disabled = false;
+        const name = document.getElementById('uf-name').value.trim();
+        const email = document.getElementById('uf-email').value.trim();
+        const jobRoleId = document.getElementById('uf-job-role').value;
+        const jobFunctionId = document.getElementById('uf-job-function').value;
+        const groupsVal = document.getElementById('uf-groups').value;
+        const groups = groupsVal ? [parseInt(groupsVal)] : [];
+        
+        const creditorCode = document.getElementById('uf-creditor').value.trim();
+        const select = document.getElementById('uf-job-role');
+        const selectedText = select.options[select.selectedIndex]?.text.toLowerCase() || '';
+        const isApprover = selectedText.includes('aprov');
+        const isAdmin = selectedText.includes('admin');
+        const isFinance = selectedText.includes('finan');
+
+        AdminPage.syncApproverRulesFromDom();
+        let approverRules = [];
+        let scopeDepartments = [];
+        let scopeFunctions = [];
+        
+        const funcSelect = document.getElementById('uf-job-function');
+        const funcText = funcSelect ? (funcSelect.options[funcSelect.selectedIndex]?.text.toLowerCase() || '') : '';
+        const isGestorOrDiretor = AdminPage.getFunctionRank(funcText) <= 2;
+
+        if (isApprover || isAdmin || isFinance) {
+          if (isAdmin || isFinance || (isApprover && isGestorOrDiretor)) {
+            approverRules = (AdminPage._approverRules || []).map(r => ({
+              function_ids: (r.function_ids || []).map(Number),
+              department_ids: (r.department_ids || []).map(Number)
+            })).filter(r => r.function_ids.length > 0 || r.department_ids.length > 0);
+          } else if (isApprover) {
+            const firstRule = (AdminPage._approverRules && AdminPage._approverRules[0]) || { function_ids: [] };
+            approverRules = [{
+              function_ids: (firstRule.function_ids || []).map(Number),
+              department_ids: groups
+            }];
+          }
+
+          if (isAdmin || isFinance || (isApprover && isGestorOrDiretor)) {
+            if (approverRules.length === 0) {
+              errEl.textContent = 'Adicione pelo menos uma regra de aprovação com Função e Departamento.';
+              errEl.classList.remove('hidden');
+              toast('Adicione pelo menos uma regra de aprovação', 'warning');
+              return;
+            }
+            for (let i = 0; i < approverRules.length; i++) {
+              const rule = approverRules[i];
+              if (!rule.function_ids || rule.function_ids.length === 0) {
+                errEl.textContent = `Selecione pelo menos uma Função na regra ${i + 1} de aprovação.`;
+                errEl.classList.remove('hidden');
+                toast(`Selecione uma Função na regra ${i + 1}`, 'warning');
+                return;
+              }
+              if (!rule.department_ids || rule.department_ids.length === 0) {
+                errEl.textContent = `Selecione pelo menos um Departamento na regra ${i + 1} de aprovação.`;
+                errEl.classList.remove('hidden');
+                toast(`Selecione um Departamento na regra ${i + 1}`, 'warning');
+                return;
+              }
+            }
+          } else if (isApprover) {
+            if (approverRules.length === 0 || !approverRules[0].function_ids || approverRules[0].function_ids.length === 0) {
+              errEl.textContent = 'Selecione pelo menos uma Função para aprovação.';
+              errEl.classList.remove('hidden');
+              toast('Selecione uma Função para aprovação', 'warning');
+              return;
+            }
+          }
+
+          scopeFunctions = Array.from(new Set(approverRules.flatMap(r => r.function_ids)));
+          scopeDepartments = Array.from(new Set(approverRules.flatMap(r => r.department_ids)));
+        }
+
+        const paymentMethod = document.getElementById('uf-payment').value;
+        const pixKey = document.getElementById('uf-pix').value.trim();
+        const bank = document.getElementById('uf-bank').value.trim();
+        const agency = document.getElementById('uf-agency').value.trim();
+        const account = document.getElementById('uf-account').value.trim();
+
+        if (!creditorCode || !name || !email || !paymentMethod || groups.length === 0 || !jobRoleId) {
+          errEl.textContent = 'Preencha os campos obrigatórios básicos (Código do credor, Nome, E-mail, Perfil, Departamento, Forma de Pagamento).';
+          errEl.classList.remove('hidden');
+          toast('Preencha os campos obrigatórios (*)', 'warning');
+          return;
+        }
+
+        const isBankPayment = ['TED', 'Depósito Itaú'].includes(paymentMethod);
+        const body = { 
+          creditor_code: creditorCode,
+          name, 
+          email, 
+          job_role_id: jobRoleId ? parseInt(jobRoleId) : null,
+          job_function_id: jobFunctionId ? parseInt(jobFunctionId) : null,
+          groups,
+          cost_center_id: groups.length > 0 ? groups[0] : null,
+          approver_of: scopeDepartments,
+          approver_of_functions: scopeFunctions,
+          approver_rules: approverRules,
+          payment_method: paymentMethod || null,
+          pix_key: paymentMethod === 'PIX' ? pixKey : null,
+          bank: isBankPayment ? bank : null,
+          agency: isBankPayment ? agency : null,
+          account: isBankPayment ? account : null
+        };
+        if (!id) body.active = true;
+
+        btn.disabled = true;
+        btn.textContent = '⏳ Salvando...';
+        try {
+          if (id) await Api.updateUser(id, body);
+          else await Api.createUser(body);
+          toast(id ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!', 'success');
+          Modal.close();
+          this.renderUsers();
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.classList.remove('hidden');
+          toast(err.message, 'error');
+          btn.disabled = false;
+          btn.textContent = '💾 Salvar';
+        }
+      } catch (globalErr) {
+        console.error('Erro ao processar formulário de usuário:', globalErr);
+        if (errEl) {
+          errEl.textContent = globalErr.message || 'Erro inesperado ao salvar usuário.';
+          errEl.classList.remove('hidden');
+        }
+        toast(globalErr.message || 'Erro inesperado ao salvar', 'error');
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '💾 Salvar';
+        }
       }
     });
   },
@@ -1217,7 +1240,11 @@ const AdminPage = {
       if (!res.ok) return;
       const matches = await res.json();
       if (matches && matches.length > 0) {
-        const cred = matches[0];
+        // Prioritize PF (CPF / employee) over PJ (CNPJ)
+        const exactPF = matches.find(c => c.name.toLowerCase() === nameQuery.toLowerCase() && (c.cpf || c.employee === 'S'));
+        const exact = matches.find(c => c.name.toLowerCase() === nameQuery.toLowerCase());
+        const bestPF = matches.find(c => c.cpf || c.employee === 'S');
+        const cred = exactPF || exact || bestPF || matches[0];
         document.getElementById('uf-creditor').value = cred.id;
         document.getElementById('uf-name').value = cred.name;
         const existing = document.getElementById('creditor-autocomplete');
@@ -1261,7 +1288,10 @@ const AdminPage = {
       matches.forEach(cred => {
         const item = document.createElement('div');
         item.style.cssText = 'padding:10px 12px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:13px; color:#222222; text-align:left; display:flex; flex-direction:column; gap:3px; background:#ffffff; transition:background 0.15s;';
-        item.innerHTML = `<div style="font-weight:700; color:#0e4b26;">${escHtml(cred.name)}</div><div style="font-size:11px; color:#666666;">Código Credor: <strong>${cred.id}</strong>${cred.cpf ? ' | CPF: ' + cred.cpf : ''}${cred.cnpj ? ' | CNPJ: ' + cred.cnpj : ''}</div>`;
+        const docBadge = cred.cpf 
+          ? `<span style="background:#e8f5e9; color:#1b5e20; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">CPF: ${cred.cpf} (Pessoa Física)</span>` 
+          : (cred.cnpj ? `<span style="background:#fff3e0; color:#e65100; padding:2px 8px; border-radius:4px; font-size:11px;">CNPJ: ${cred.cnpj} (Pessoa Jurídica)</span>` : '');
+        item.innerHTML = `<div style="font-weight:700; color:#0e4b26;">${escHtml(cred.name)}</div><div style="font-size:11px; color:#666666; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">Código Credor: <strong>${cred.id}</strong> ${docBadge}</div>`;
         
         item.onmouseover = () => item.style.background = '#eef7f2';
         item.onmouseout = () => item.style.background = '#ffffff';
@@ -1299,52 +1329,85 @@ const AdminPage = {
       return;
     }
     
-    let cred = window.siengeCreditors ? window.siengeCreditors.find(c => c.id == code) : null;
-    let fetchStatus = 'NotFetched';
-    
+    let cred = null;
     try {
       const credRes = await fetch(`/api/sienge/creditors/${code}`);
       if (credRes.ok) {
-        const liveCred = await credRes.json();
-        if (liveCred) {
-          cred = liveCred;
-          fetchStatus = 'LiveOK';
-        }
-      } else {
-        fetchStatus = 'HTTP' + credRes.status;
+        cred = await credRes.json();
       }
     } catch (e) {
       console.warn('Live creditor fetch error:', e);
-      fetchStatus = 'Err:' + e.message;
     }
 
     if (cred) {
       document.getElementById('uf-name').value = cred.name || '';
       
       let email = '';
+      // 1. Procurar primeiro e-mail oficial @mouraleite.com.br nos contatos
       if (cred.contacts && cred.contacts.length > 0) {
-        const cEmail = cred.contacts.find(c => c.email && c.email.trim() !== '');
-        if (cEmail) email = cEmail.email.trim();
-      }
-      if (!email && cred.otherContactMethods && cred.otherContactMethods.length > 0) {
-        // Look for any string with @ in any property, just to be safe
-        const oEmail = cred.otherContactMethods.find(o => 
-          (o.address && o.address.includes('@')) || 
-          (o.email && o.email.includes('@')) ||
-          (o.contact && typeof o.contact === 'string' && o.contact.includes('@'))
-        );
-        if (oEmail) {
-           email = (oEmail.address || oEmail.email || oEmail.contact || '').trim();
+        const mlEmail = cred.contacts.find(c => c.email && c.email.toLowerCase().includes('@mouraleite.com.br'));
+        if (mlEmail) {
+          email = mlEmail.email.trim();
+        } else {
+          const cEmail = cred.contacts.find(c => c.email && c.email.trim() !== '');
+          if (cEmail) email = cEmail.email.trim();
         }
       }
-      
-      if (!email) {
-         // fallback: show debug info
-         document.getElementById('uf-email').placeholder = `[${fetchStatus}] c:${cred.contacts?.length||0} o:${cred.otherContactMethods?.length||0}`;
-         document.getElementById('uf-email').value = '';
-      } else {
-         document.getElementById('uf-email').value = email;
+      // 2. Procurar em otherContactMethods
+      if (!email || !email.toLowerCase().includes('@mouraleite.com.br')) {
+        if (cred.otherContactMethods && cred.otherContactMethods.length > 0) {
+          const mlOEmail = cred.otherContactMethods.find(o => 
+            (o.address && o.address.toLowerCase().includes('@mouraleite.com.br')) ||
+            (o.email && o.email.toLowerCase().includes('@mouraleite.com.br')) ||
+            (o.contact && typeof o.contact === 'string' && o.contact.toLowerCase().includes('@mouraleite.com.br'))
+          );
+          if (mlOEmail) {
+            email = (mlOEmail.address || mlOEmail.email || mlOEmail.contact || '').trim();
+          } else if (!email) {
+            const oEmail = cred.otherContactMethods.find(o => 
+              (o.address && o.address.includes('@')) || 
+              (o.email && o.email.includes('@')) ||
+              (o.contact && typeof o.contact === 'string' && o.contact.includes('@'))
+            );
+            if (oEmail) {
+              email = (oEmail.address || oEmail.email || oEmail.contact || '').trim();
+            }
+          }
+        }
       }
+
+      // 3. Se não houver e-mail @mouraleite.com.br e o credor for PJ ou e-mail de contabilidade externo, verificar se existe o credor Pessoa Física no Sienge com o mesmo nome
+      if (!email.toLowerCase().includes('@mouraleite.com.br') && cred.name) {
+        try {
+          const searchRes = await fetch('/api/sienge/creditors/search?query=' + encodeURIComponent(cred.name));
+          if (searchRes.ok) {
+            const sameNameCreditors = await searchRes.json();
+            const pfMatch = sameNameCreditors.find(c => String(c.id) !== String(code) && (c.cpf || c.employee === 'S'));
+            if (pfMatch) {
+              const pfRes = await fetch(`/api/sienge/creditors/${pfMatch.id}`);
+              if (pfRes.ok) {
+                const pfCred = await pfRes.json();
+                if (pfCred) {
+                  const pfEmail = (pfCred.contacts || []).find(c => c.email && c.email.toLowerCase().includes('@mouraleite.com.br'))?.email ||
+                                  (pfCred.otherContactMethods || []).find(o => (o.address || '').toLowerCase().includes('@mouraleite.com.br'))?.address;
+                  if (pfEmail) {
+                    email = pfEmail.trim();
+                    code = pfMatch.id;
+                    cred = pfCred;
+                    document.getElementById('uf-creditor').value = pfMatch.id;
+                    toast(`Vinculado ao credor Pessoa Física Cód: ${pfMatch.id} (CPF: ${pfMatch.cpf})`, 'info');
+                  }
+                }
+              }
+            }
+          }
+        } catch(e) {
+          console.warn('Check PF creditor error:', e);
+        }
+      }
+
+      document.getElementById('uf-email').value = email;
+      document.getElementById('uf-email').placeholder = 'email@mouraleite.com.br';
     } else {
       document.getElementById('uf-name').value = '';
       document.getElementById('uf-email').value = '';
@@ -1359,7 +1422,7 @@ const AdminPage = {
         const pixRes = await Api.getCreditorPixInformations(code);
         if (pixRes && pixRes.results && pixRes.results.length > 0) {
           const pixInfo = pixRes.results.find(p => p.defaultFlag === 'S') || pixRes.results[0];
-          pixKeyToFill = pixInfo.pixKey || pixInfo.cpf || pixInfo.cnpj || '';
+          pixKeyToFill = pixInfo.key || pixInfo.pixKey || pixInfo.cpfCnpjBeneficiary || pixInfo.cpf || pixInfo.cnpj || '';
           paymentFormToFill = 'PIX';
         }
       } catch(e) {
@@ -1374,7 +1437,7 @@ const AdminPage = {
           if (!paymentFormToFill && bankInfo.paymentForm === 'PIX') {
             paymentFormToFill = 'PIX';
             if (!pixKeyToFill) {
-               pixKeyToFill = bankInfo.cpf || bankInfo.cnpj || '';
+              pixKeyToFill = bankInfo.key || bankInfo.pixKey || bankInfo.cpfCnpjBeneficiary || bankInfo.cpf || bankInfo.cnpj || '';
             }
           } else if (!paymentFormToFill) {
             paymentFormToFill = (String(bankInfo.bank).includes('341')) ? 'Depósito Itaú' : 'TED';

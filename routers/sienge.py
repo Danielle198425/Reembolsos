@@ -138,7 +138,8 @@ def search_creditors(query: str = ""):
         for c in creditors:
             c_id = c.get("id")
             if c_id == q_id or str(c_id).startswith(query):
-                results.append({"id": c_id, "name": c.get("name"), "cpf": c.get("cpf"), "cnpj": c.get("cnpj")})
+                results.append({"id": c_id, "name": c.get("name"), "cpf": c.get("cpf"), "cnpj": c.get("cnpj"), "employee": c.get("employee")})
+        results.sort(key=lambda x: (0 if x.get("cpf") or x.get("employee") == "S" else 1, x.get("id")))
         return results[:30]
 
     raw_parts = [p.strip() for p in re.split(r'[% ]+', query) if p.strip()]
@@ -156,8 +157,9 @@ def search_creditors(query: str = ""):
         name = c.get("name") or ""
         trade = c.get("tradeName") or ""
         if regex.search(name) or regex.search(trade):
-            results.append({"id": c.get("id"), "name": name, "tradeName": trade, "cpf": c.get("cpf"), "cnpj": c.get("cnpj")})
+            results.append({"id": c.get("id"), "name": name, "tradeName": trade, "cpf": c.get("cpf"), "cnpj": c.get("cnpj"), "employee": c.get("employee")})
 
+    results.sort(key=lambda x: (0 if x.get("cpf") or x.get("employee") == "S" else 1, x.get("id")))
     return results[:50]
 
 @router.get("/creditors/{creditor_id}")
