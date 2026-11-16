@@ -58,6 +58,10 @@ STATUS_TRANSITIONS = {
             [models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.finalizado
         ),
+        "reject": (
+            [models.UserRole.admin, models.UserRole.financeiro],
+            models.ExpenseStatus.rejeitado
+        ),
     },
     models.ExpenseStatus.aguardando_finalizacao: {
         "finalize": (
@@ -604,11 +608,17 @@ def _transition(expense_id: int, action: str, current_user: models.User, db: Ses
         if admin_obj:
             imp_name = admin_obj.name
 
-    # Aprovador não pode aprovar/reprovar a própria despesa (administrador pode)
-    if action in ["approve", "reject"] and current_user.role in [models.UserRole.aprovador, models.UserRole.financeiro]:
+    # Usuário comum/aprovador/financeiro não pode aprovar/reprovar a própria despesa (administrador pode)
+    if action in ["approve", "reject"] and current_user.role != models.UserRole.admin:
         if expense.user_id == current_user.id:
-            raise HTTPException(403, "Aprovadores não possuem permissão para aprovar ou reprovar as suas próprias despesas.")
+            raise HTTPException(403, "Não é permitido aprovar ou reprovar a sua própria despesa.")
 
+    # Perfil Financeiro não aprova despesa de nenhum usuário (apenas rejeitar, finalizar, exportar e enviar para pagamento)
+    if action == "approve" and current_user.role == models.UserRole.financeiro:
+        raise HTTPException(403, "O perfil Financeiro não possui permissão para aprovar despesas.")
+
+    # Apenas o perfil Aprovador tem validação restrita por regras/departamentos
+    if action in ["approve", "reject"] and current_user.role == models.UserRole.aprovador:
         rules = []
         if getattr(current_user, 'approver_rules', None):
             try:
