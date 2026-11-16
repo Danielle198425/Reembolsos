@@ -829,8 +829,9 @@ const ExpensesPage = {
 
   _rowHTML(e, checkedIds = null) {
     const isAdminOrFinance = App.user?.role === 'admin' || App.user?.role === 'financeiro';
-    const isFinalized = e.status === 'finalizado' || e.status === 'pago';
-    const canEdit = App.user?.role === 'admin' || (!isFinalized && (e.user_id === App.user?.id || App.user?.role === 'aprovador' || App.user?.role === 'financeiro'));
+    const isLockedFromEdit = e.status === 'enviado' || e.status === 'pago';
+    const isFinalized = e.status === 'finalizado' || isLockedFromEdit;
+    const canEdit = !isLockedFromEdit && (App.user?.role === 'admin' || (!isFinalized && (e.user_id === App.user?.id || App.user?.role === 'aprovador' || App.user?.role === 'financeiro')));
     const isSelf = e.user_id === App.user?.id;
     const canApprove = (App.user?.role === 'admin' || (App.user?.role === 'aprovador' && !isSelf)) &&
                        e.status === 'aguardando_aprovacao';
@@ -1375,7 +1376,13 @@ const ExpensesPage = {
 
     let expense = null;
     if (id) {
-      try { expense = await Api.getExpense(id); } catch(e) { toast(e.message, 'error'); return; }
+      try {
+        expense = await Api.getExpense(id);
+        if (expense && (expense.status === 'enviado' || expense.status === 'pago')) {
+          toast('Despesas com status "Enviado para Pagamento" ou "Pago" não podem ser editadas.', 'warning');
+          return;
+        }
+      } catch(e) { toast(e.message, 'error'); return; }
     }
 
 

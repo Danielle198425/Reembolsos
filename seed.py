@@ -33,15 +33,18 @@ def run_seed():
             db.add(models.MileageRate(name="Nível 2 - Diretor", rate=2.20, active=True))
             db.commit()
 
-        # Seedar Logo oficial da Moura Leite se não existir
+        # Seedar Logo oficial da Moura Leite se não existir ou atualizar
         import base64, os
-        svg_path = os.path.join("static", "icons", "moura_logo_color.svg")
-        if os.path.exists(svg_path):
-            with open(svg_path, "r", encoding="utf-8") as f:
-                logo_b64 = "data:image/svg+xml;base64," + base64.b64encode(f.read().encode("utf-8")).decode("utf-8")
+        logo_png_path = os.path.join("static", "icons", "logo-stacked.png")
+        if os.path.exists(logo_png_path):
+            with open(logo_png_path, "rb") as f:
+                logo_b64 = "data:image/png;base64," + base64.b64encode(f.read()).decode("utf-8")
             logo_entry = db.query(models.CompanyLogo).first()
             if not logo_entry:
                 db.add(models.CompanyLogo(data=logo_b64))
+                db.commit()
+            elif logo_entry and (not logo_entry.data or "svg" in logo_entry.data or len(logo_entry.data) < 1000):
+                logo_entry.data = logo_b64
                 db.commit()
 
         # Seedar Modelos de E-mail padrão (Datas de fechamento e Data de Pagamento)

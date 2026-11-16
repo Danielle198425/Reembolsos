@@ -970,10 +970,7 @@ const AdminPage = {
           <input type="text" id="uf-name" value="${escHtml(user?.name || '')}" placeholder="Nome ou Busca (ex: %Moura%)" oninput="AdminPage.autoFillCreditorByName(this.value)" onkeydown="if(event.key === 'Tab' || event.key === 'Enter') { AdminPage.autoFillCreditorOnTabOrBlur(this.value); }" onblur="AdminPage.autoFillCreditorOnTabOrBlur(this.value)" />
         </div>
         <div class="field required">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <label for="uf-email">E-mail</label>
-            <span style="cursor:pointer; font-size:16px;" title="Enviar e-mail de criação de senha" onclick="AdminPage.sendPasswordEmail()">📨</span>
-          </div>
+          <label for="uf-email">E-mail</label>
           <input type="email" id="uf-email" value="${escHtml(user?.email || '')}" placeholder="email@mouraleite.com.br" />
         </div>
         <div class="field">
@@ -1408,27 +1405,7 @@ const AdminPage = {
     }
   },
 
-  async sendPasswordEmail() {
-    const emailInput = document.getElementById('uf-email');
-    if (!emailInput) return;
-    const email = emailInput.value.trim();
-    if (!email) {
-      toast('Preencha o campo de e-mail primeiro', 'warning');
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast('Digite um e-mail válido', 'warning');
-      return;
-    }
 
-    try {
-      await Api.sendPasswordEmail(email);
-      toast('E-mail enviado com sucesso!', 'success');
-    } catch(err) {
-      toast(err.message || 'Erro ao enviar e-mail', 'error');
-    }
-  },
 
   getFunctionRank(name) {
     if (!name) return 999;

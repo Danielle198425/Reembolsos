@@ -81,14 +81,14 @@ async function applyAppLogo() {
     if (loginLogo) {
       loginLogo.innerHTML = `<img src="${logoData}" style="max-height:100%; max-width:100%; object-fit:contain; display:block; margin:auto;" alt="Moura Leite" />`;
       loginLogo.style.background = '#ffffff';
-      loginLogo.style.padding = '12px 16px';
+      loginLogo.style.padding = '8px 12px';
       loginLogo.style.display = 'inline-flex';
       loginLogo.style.alignItems = 'center';
       loginLogo.style.justifyContent = 'center';
       loginLogo.style.borderRadius = '14px';
       loginLogo.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
       loginLogo.style.width = 'auto';
-      loginLogo.style.height = '80px';
+      loginLogo.style.height = '86px';
       loginLogo.style.flexShrink = '0';
     }
     const sidebarLogo = document.getElementById('sidebar-logo-mark');

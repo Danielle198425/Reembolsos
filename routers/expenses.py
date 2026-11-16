@@ -434,7 +434,9 @@ def update_expense(
         raise HTTPException(404, "Despesa não encontrada")
     if expense.user_id != current_user.id and current_user.role not in [models.UserRole.admin, models.UserRole.aprovador, models.UserRole.financeiro]:
         raise HTTPException(403, "Acesso negado")
-    if expense.status in [models.ExpenseStatus.finalizado, models.ExpenseStatus.pago] and current_user.role != models.UserRole.admin:
+    if expense.status in [models.ExpenseStatus.enviado, models.ExpenseStatus.pago]:
+        raise HTTPException(400, "Despesas com status 'Enviado para Pagamento' ou 'Pago' não podem ser editadas.")
+    if expense.status == models.ExpenseStatus.finalizado and current_user.role != models.UserRole.admin:
         raise HTTPException(400, "Despesas finalizadas só podem ser editadas pelo administrador.")
 
     # Validação de regras por centro de custo e categoria ao atualizar
