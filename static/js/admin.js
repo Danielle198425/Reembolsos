@@ -3573,12 +3573,8 @@ const AdminPage = {
       this._ccRuleActiveUsers = activeUsers;
       this._ccRulesList = rules || [];
 
-      const ccOptionsHtml = activeCcs.map(c => 
-        `<option value="${c.id}">${escHtml(c.code ? c.code + ' - ' : '')}${escHtml(c.name)}</option>`
-      ).join('');
-
       const usersChecklistHtml = activeUsers.map(u => `
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-1);cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);">
+        <label class="cc-user-item-label" data-text="${escHtml((u.name + ' ' + (u.role || '')).toLowerCase())}" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-1);cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);">
           <input type="checkbox" class="cc-user-checkbox" value="${u.id}" />
           <span>${escHtml(u.name)} <small style="color:var(--text-3);">(${escHtml(u.role)})</small></span>
         </label>
@@ -3661,15 +3657,22 @@ const AdminPage = {
             <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px;">
               <div style="font-weight:700;font-size:14px;color:var(--text-1);" id="cc-form-title">➕ Criar Nova Regra por Centro de Custo</div>
               
-              <!-- 1. Seletor de Centro de Custo -->
-              <div class="field required">
+              <!-- 1. Seletor de Centros de Custo (Estilo Dropdown Multi-Seleção) -->
+              <div class="field required" style="position:relative;z-index:60;">
                 <label style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">Centros de Custo *</label>
-                <div id="cc-rule-selectors-wrapper" style="display:flex;flex-direction:column;gap:8px;">
-                  <div class="cc-selector-row" style="display:flex;align-items:center;gap:8px;">
-                    <select class="cc-rule-select" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text-1);">
-                      <option value="">Selecione a centro de custo...</option>
-                      ${ccOptionsHtml}
-                    </select>
+                <button type="button" id="cc-ccs-dropdown-btn" onclick="AdminPage.toggleCcCcsDropdown(event)"
+                        style="width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text-1);display:flex;align-items:center;justify-content:space-between;cursor:pointer;outline:none;">
+                  <span id="cc-ccs-dropdown-label" style="font-weight:500;">Selecione os centros de custo...</span>
+                  <span style="font-size:12px;color:var(--text-3);">▼</span>
+                </button>
+
+                <div id="cc-ccs-dropdown-menu" onclick="event.stopPropagation()" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:280px;overflow-y:auto;overscroll-behavior:contain;box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:10px;margin-top:4px;">
+                  <div style="position:sticky;top:0;background:var(--surface);padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid var(--border);z-index:2;">
+                    <input type="text" id="cc-ccs-search-input" placeholder="🔍 Filtrar centros de custo..." oninput="AdminPage.filterCcCcsList()"
+                           style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface-2);color:var(--text-1);outline:none;" />
+                  </div>
+                  <div id="cc-ccs-checklist-container" style="display:flex;flex-direction:column;gap:6px;padding-bottom:4px;">
+                    <!-- Preenchido dinamicamente por renderCcCcsChecklist() -->
                   </div>
                 </div>
               </div>
@@ -3683,8 +3686,12 @@ const AdminPage = {
                   <span style="font-size:12px;color:var(--text-3);">▼</span>
                 </button>
 
-                <div id="cc-users-dropdown-menu" onclick="event.stopPropagation()" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:240px;overflow-y:auto;overscroll-behavior:contain;box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:10px;margin-top:4px;">
-                  <div style="display:flex;flex-direction:column;gap:6px;padding-bottom:4px;">
+                <div id="cc-users-dropdown-menu" onclick="event.stopPropagation()" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:280px;overflow-y:auto;overscroll-behavior:contain;box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:10px;margin-top:4px;">
+                  <div style="position:sticky;top:0;background:var(--surface);padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid var(--border);z-index:2;">
+                    <input type="text" id="cc-users-search-input" placeholder="🔍 Filtrar usuários..." oninput="AdminPage.filterCcUsersList()"
+                           style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface-2);color:var(--text-1);outline:none;" />
+                  </div>
+                  <div id="cc-users-checklist-container" style="display:flex;flex-direction:column;gap:6px;padding-bottom:4px;">
                     ${usersChecklistHtml || '<div style="color:var(--text-4);font-size:12px;">Nenhum usuário ativo encontrado.</div>'}
                   </div>
                 </div>
@@ -3716,19 +3723,28 @@ const AdminPage = {
         </div>
       `;
 
+      // Renderiza o checklist de Centros de Custo (filtrando os que já possuem regra)
+      this.renderCcCcsChecklist();
+
       // Event listeners para atualização dinâmica do rótulo do dropdown de usuários
       document.querySelectorAll('.cc-user-checkbox').forEach(cb => {
         cb.addEventListener('change', () => this.updateCcUsersDropdownLabel());
       });
 
-      // Fechar dropdown ao clicar fora
-      if (!this._ccUserDropdownOutsideBound) {
-        this._ccUserDropdownOutsideBound = true;
+      // Fechar dropdowns ao clicar fora
+      if (!this._ccDropdownsOutsideBound) {
+        this._ccDropdownsOutsideBound = true;
         document.addEventListener('click', (e) => {
-          const btn = document.getElementById('cc-users-dropdown-btn');
-          const menu = document.getElementById('cc-users-dropdown-menu');
-          if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) {
-            menu.style.display = 'none';
+          const ccsBtn = document.getElementById('cc-ccs-dropdown-btn');
+          const ccsMenu = document.getElementById('cc-ccs-dropdown-menu');
+          if (ccsMenu && ccsBtn && !ccsBtn.contains(e.target) && !ccsMenu.contains(e.target)) {
+            ccsMenu.style.display = 'none';
+          }
+
+          const usersBtn = document.getElementById('cc-users-dropdown-btn');
+          const usersMenu = document.getElementById('cc-users-dropdown-menu');
+          if (usersMenu && usersBtn && !usersBtn.contains(e.target) && !usersMenu.contains(e.target)) {
+            usersMenu.style.display = 'none';
           }
         });
       }
@@ -3789,12 +3805,120 @@ const AdminPage = {
     }
   },
 
+  renderCcCcsChecklist() {
+    const container = document.getElementById('cc-ccs-checklist-container');
+    if (!container || !this._ccRuleActiveCcs) return;
+
+    // Identifica todos os centros de custo já cadastrados em outras regras
+    const usedCcKeys = new Set();
+    (this._ccRulesList || []).forEach(r => {
+      // Se estiver editando, os centros de custo desta regra permanecem disponíveis para edição
+      if (this._editingCcRuleId && r.id === this._editingCcRuleId) return;
+
+      if (Array.isArray(r.cost_center_ids)) {
+        r.cost_center_ids.forEach(id => {
+          if (id !== undefined && id !== null) usedCcKeys.add(String(id).trim().toLowerCase());
+        });
+      }
+      if (Array.isArray(r.cost_centers)) {
+        r.cost_centers.forEach(cc => {
+          if (cc.id !== undefined && cc.id !== null) usedCcKeys.add(String(cc.id).trim().toLowerCase());
+          if (cc.code) usedCcKeys.add(String(cc.code).trim().toLowerCase());
+          if (cc.name) usedCcKeys.add(String(cc.name).trim().toLowerCase());
+        });
+      }
+    });
+
+    const availableCcs = this._ccRuleActiveCcs.filter(c => {
+      const idKey = String(c.id).trim().toLowerCase();
+      const codeKey = c.code ? String(c.code).trim().toLowerCase() : '';
+      const nameKey = c.name ? String(c.name).trim().toLowerCase() : '';
+      if (usedCcKeys.has(idKey)) return false;
+      if (codeKey && usedCcKeys.has(codeKey)) return false;
+      if (nameKey && usedCcKeys.has(nameKey)) return false;
+      return true;
+    });
+
+    if (availableCcs.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-4);font-size:12px;padding:8px;">Todos os centros de custo ativos já possuem regras cadastradas.</div>';
+      return;
+    }
+
+    container.innerHTML = availableCcs.map(c => `
+      <label class="cc-item-label" data-text="${escHtml(((c.code ? c.code + ' ' : '') + (c.name || '')).toLowerCase())}" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-1);cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);">
+        <input type="checkbox" class="cc-cost-center-checkbox" value="${c.id}" />
+        <span>${escHtml(c.code ? c.code + ' - ' : '')}${escHtml(c.name)}</span>
+      </label>
+    `).join('');
+
+    container.querySelectorAll('.cc-cost-center-checkbox').forEach(cb => {
+      cb.addEventListener('change', () => this.updateCcCcsDropdownLabel());
+    });
+  },
+
+  toggleCcCcsDropdown(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('cc-ccs-dropdown-menu');
+    if (!menu) return;
+    const isHidden = menu.style.display === 'none';
+    menu.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      const usersMenu = document.getElementById('cc-users-dropdown-menu');
+      if (usersMenu) usersMenu.style.display = 'none';
+      const searchInput = document.getElementById('cc-ccs-search-input');
+      if (searchInput) {
+        searchInput.value = '';
+        this.filterCcCcsList();
+        setTimeout(() => searchInput.focus(), 50);
+      }
+    }
+  },
+
+  updateCcCcsDropdownLabel() {
+    const label = document.getElementById('cc-ccs-dropdown-label');
+    if (!label) return;
+    const checked = document.querySelectorAll('.cc-cost-center-checkbox:checked');
+    if (checked.length === 0) {
+      label.textContent = 'Selecione os centros de custo...';
+      label.style.fontWeight = '500';
+    } else if (checked.length === 1) {
+      const parentLabel = checked[0].parentElement;
+      const ccName = parentLabel ? (parentLabel.querySelector('span')?.textContent || '1 centro de custo') : '1 centro de custo';
+      label.textContent = `1 centro de custo selecionado (${ccName.trim()})`;
+      label.style.fontWeight = '600';
+    } else {
+      label.textContent = `${checked.length} centros de custo selecionados`;
+      label.style.fontWeight = '600';
+    }
+  },
+
+  filterCcCcsList() {
+    const searchInput = document.getElementById('cc-ccs-search-input');
+    if (!searchInput) return;
+    const term = (searchInput.value || '').toLowerCase().trim();
+    const items = document.querySelectorAll('#cc-ccs-checklist-container .cc-item-label');
+    items.forEach(el => {
+      const text = el.getAttribute('data-text') || el.textContent.toLowerCase();
+      el.style.display = (!term || text.includes(term)) ? 'flex' : 'none';
+    });
+  },
+
   toggleCcUsersDropdown(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('cc-users-dropdown-menu');
     if (!menu) return;
     const isHidden = menu.style.display === 'none';
     menu.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      const ccsMenu = document.getElementById('cc-ccs-dropdown-menu');
+      if (ccsMenu) ccsMenu.style.display = 'none';
+      const searchInput = document.getElementById('cc-users-search-input');
+      if (searchInput) {
+        searchInput.value = '';
+        this.filterCcUsersList();
+        setTimeout(() => searchInput.focus(), 50);
+      }
+    }
   },
 
   updateCcUsersDropdownLabel() {
@@ -3815,25 +3939,15 @@ const AdminPage = {
     }
   },
 
-  addCcSelectorRow() {
-    const wrapper = document.getElementById('cc-rule-selectors-wrapper');
-    if (!wrapper || !this._ccRuleActiveCcs) return;
-
-    const ccOptionsHtml = this._ccRuleActiveCcs.map(c => 
-      `<option value="${c.id}">${escHtml(c.code ? c.code + ' - ' : '')}${escHtml(c.name)}</option>`
-    ).join('');
-
-    const row = document.createElement('div');
-    row.className = 'cc-selector-row';
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;';
-    row.innerHTML = `
-      <select class="cc-rule-select" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text-1);">
-        <option value="">Selecione outro centro de custo...</option>
-        ${ccOptionsHtml}
-      </select>
-      <button class="btn btn-sm btn-ghost" onclick="this.parentElement.remove()" title="Remover seletor" style="color:var(--red);padding:4px 8px;">✕</button>
-    `;
-    wrapper.appendChild(row);
+  filterCcUsersList() {
+    const searchInput = document.getElementById('cc-users-search-input');
+    if (!searchInput) return;
+    const term = (searchInput.value || '').toLowerCase().trim();
+    const items = document.querySelectorAll('#cc-users-checklist-container .cc-user-item-label');
+    items.forEach(el => {
+      const text = el.getAttribute('data-text') || el.textContent.toLowerCase();
+      el.style.display = (!term || text.includes(term)) ? 'flex' : 'none';
+    });
   },
 
   editCcRule(id) {
@@ -3842,11 +3956,17 @@ const AdminPage = {
     if (!rule) return;
 
     this._editingCcRuleId = id;
+    this.renderCcCcsChecklist();
 
-    const select = document.querySelector('.cc-rule-select');
-    if (select && rule.cost_center_ids && rule.cost_center_ids.length > 0) {
-      select.value = rule.cost_center_ids[0];
-    }
+    const allowedCcSet = new Set((rule.cost_center_ids || []).map(c => String(c).trim().toLowerCase()));
+    (rule.cost_centers || []).forEach(cc => {
+      if (cc.id !== undefined && cc.id !== null) allowedCcSet.add(String(cc.id).trim().toLowerCase());
+      if (cc.code) allowedCcSet.add(String(cc.code).trim().toLowerCase());
+    });
+    document.querySelectorAll('.cc-cost-center-checkbox').forEach(cb => {
+      cb.checked = allowedCcSet.has(String(cb.value).trim().toLowerCase());
+    });
+    this.updateCcCcsDropdownLabel();
 
     const allowedUserIds = (rule.allowed_user_ids || []).map(u => String(u));
     document.querySelectorAll('.cc-user-checkbox').forEach(cb => {
@@ -3872,7 +3992,7 @@ const AdminPage = {
       saveBtn.parentElement.insertBefore(cancelBtn, saveBtn);
     }
 
-    const formContainer = document.getElementById('cc-rule-selectors-wrapper');
+    const formContainer = document.getElementById('cc-form-title');
     if (formContainer) formContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
   },
 
@@ -3887,18 +4007,19 @@ const AdminPage = {
     const cancelBtn = document.getElementById('btn-cancel-cc-rule');
     if (cancelBtn) cancelBtn.remove();
 
-    const select = document.querySelector('.cc-rule-select');
-    if (select) select.value = '';
+    this.renderCcCcsChecklist();
+    document.querySelectorAll('.cc-cost-center-checkbox').forEach(cb => cb.checked = false);
+    this.updateCcCcsDropdownLabel();
 
     document.querySelectorAll('.cc-user-checkbox').forEach(cb => cb.checked = false);
     this.updateCcUsersDropdownLabel();
   },
 
   async saveCcRule() {
-    const ccSelects = document.querySelectorAll('.cc-rule-select');
+    const ccCheckboxes = document.querySelectorAll('.cc-cost-center-checkbox:checked');
     const selectedCcIds = [];
-    ccSelects.forEach(sel => {
-      if (sel.value) selectedCcIds.push(parseInt(sel.value));
+    ccCheckboxes.forEach(cb => {
+      if (cb.value) selectedCcIds.push(cb.value);
     });
 
     const userCheckboxes = document.querySelectorAll('.cc-user-checkbox:checked');

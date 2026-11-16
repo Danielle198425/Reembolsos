@@ -1424,8 +1424,8 @@ def save_cost_center_rule(
     if not allowed_user_ids or not isinstance(allowed_user_ids, list):
         raise HTTPException(status_code=400, detail="Selecione pelo menos um Usuário ativo.")
 
-    cc_ids_clean = [int(x) for x in cost_center_ids if str(x).isdigit()]
-    user_ids_clean = [int(x) for x in allowed_user_ids if str(x).isdigit()]
+    cc_ids_clean = [int(x) if str(x).isdigit() else str(x) for x in cost_center_ids if x is not None and str(x).strip() != ""]
+    user_ids_clean = [int(x) if str(x).isdigit() else str(x) for x in allowed_user_ids if x is not None and str(x).strip() != ""]
 
     if not cc_ids_clean or not user_ids_clean:
         raise HTTPException(status_code=400, detail="Identificadores inválidos de Centro de Custo ou Usuários.")
