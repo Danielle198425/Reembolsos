@@ -72,35 +72,8 @@
         <span>Entrar com Microsoft (Entra ID)</span>
       </a>
     </form>
-    <div class="login-hints">
-      <p>Conta de demonstração:</p>
-      <div class="hint-chips">
-        <button type="button" class="hint-chip" onclick="fillLogin('admin@mouraleite.com.br','Admin@123')">Admin</button>
-      </div>
-    </div>
   </div>
 </div>
-
-<script>
-function fillLogin(email, pwd) {
-  const emailInput = document.getElementById('login-email');
-  const pwdInput = document.getElementById('login-password');
-  const errEl = document.getElementById('login-error');
-
-  if (emailInput) {
-    emailInput.value = email;
-    emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-    emailInput.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-  if (pwdInput) {
-    pwdInput.value = pwd;
-    pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
-    pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-  if (errEl) errEl.classList.add('hidden');
-}
-window.fillLogin = fillLogin;
-</script>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
      APP SHELL

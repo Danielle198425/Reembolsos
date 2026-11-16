@@ -486,25 +486,7 @@ document.getElementById('logout-btn').addEventListener('click', () => {
   toast('Sessão encerrada', 'info');
 });
 
-// Fill login demo
-function fillLogin(email, pwd) {
-  const emailInput = document.getElementById('login-email');
-  const pwdInput = document.getElementById('login-password');
-  const errEl = document.getElementById('login-error');
 
-  if (emailInput) {
-    emailInput.value = email;
-    emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-    emailInput.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-  if (pwdInput) {
-    pwdInput.value = pwd;
-    pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
-    pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-  if (errEl) errEl.classList.add('hidden');
-}
-window.fillLogin = fillLogin;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SIDEBAR COLLAPSE
