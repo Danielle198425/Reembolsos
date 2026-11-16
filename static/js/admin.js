@@ -3532,14 +3532,28 @@ const AdminPage = {
         Api.getUsers().catch(() => [])
       ]);
 
+      // Purga cache de centros de custo inválidos/inexistentes (ex: 70131 - Vendas)
+      if (window._db && Array.isArray(window._db.sienge_cost_centers)) {
+        window._db.sienge_cost_centers = window._db.sienge_cost_centers.filter(c => String(c.id || c.code).trim() !== '70131');
+        _saveDb();
+      }
+
       const ccMap = new Map();
       (allCcs || []).forEach(c => {
-        const key = String(c.code || c.id);
+        const codeStr = String(c.code || '').trim();
+        const idStr = String(c.id || '').trim();
+        if (codeStr === '70131' || idStr === '70131') return;
+        if (c.name && c.name.trim().toLowerCase() === 'vendas' && codeStr === '70131') return;
+        const key = codeStr || idStr;
         ccMap.set(key, { id: c.id, code: c.code || String(c.id), name: c.name, active: c.active !== false });
       });
 
       (siengeCcs || []).forEach(c => {
-        const key = String(c.code || c.id);
+        const codeStr = String(c.code || '').trim();
+        const idStr = String(c.id || '').trim();
+        if (codeStr === '70131' || idStr === '70131') return;
+        if (c.name && c.name.trim().toLowerCase() === 'vendas' && codeStr === '70131') return;
+        const key = codeStr || idStr;
         if (ccMap.has(key)) {
           const existing = ccMap.get(key);
           if (c.name) existing.name = c.name;
@@ -3550,14 +3564,17 @@ const AdminPage = {
 
       const localCcs = _db.sienge_cost_centers || [];
       localCcs.forEach(lc => {
-        const key = String(lc.id || lc.code);
+        const codeStr = String(lc.code || '').trim();
+        const idStr = String(lc.id || '').trim();
+        if (codeStr === '70131' || idStr === '70131') return;
+        const key = codeStr || idStr;
         if (ccMap.has(key)) {
           ccMap.get(key).active = lc.active !== false;
         }
       });
 
       const activeCcs = Array.from(ccMap.values())
-        .filter(c => c.active !== false)
+        .filter(c => c.active !== false && String(c.code || c.id).trim() !== '70131')
         .sort((a, b) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true }));
 
       const seenCcUserEmails = new Set();
@@ -3575,7 +3592,7 @@ const AdminPage = {
 
       const usersChecklistHtml = activeUsers.map(u => `
         <label class="cc-user-item-label" data-text="${escHtml((u.name + ' ' + (u.role || '')).toLowerCase())}" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-1);cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);">
-          <input type="checkbox" class="cc-user-checkbox" value="${u.id}" />
+          <input type="checkbox" class="cc-user-checkbox" value="${u.id}" data-id="${u.id}" data-email="${escHtml(u.email || '')}" />
           <span>${escHtml(u.name)} <small style="color:var(--text-3);">(${escHtml(u.role)})</small></span>
         </label>
       `).join('');
@@ -3809,11 +3826,28 @@ const AdminPage = {
     const container = document.getElementById('cc-ccs-checklist-container');
     if (!container || !this._ccRuleActiveCcs) return;
 
-    // Identifica todos os centros de custo já cadastrados em outras regras
+    // Regra sendo editada (se houver)
+    const editingRule = this._editingCcRuleId 
+      ? (this._ccRulesList || []).find(r => String(r.id) === String(this._editingCcRuleId)) 
+      : null;
+
+    const editingCcKeys = new Set();
+    if (editingRule) {
+      (editingRule.cost_center_ids || []).forEach(x => {
+        if (x !== undefined && x !== null) editingCcKeys.add(String(x).trim().toLowerCase());
+      });
+      (editingRule.cost_centers || []).forEach(c => {
+        if (c.id !== undefined && c.id !== null) editingCcKeys.add(String(c.id).trim().toLowerCase());
+        if (c.code) editingCcKeys.add(String(c.code).trim().toLowerCase());
+        if (c.name) editingCcKeys.add(String(c.name).trim().toLowerCase());
+      });
+    }
+
+    // Identifica todos os centros de custo já cadastrados em OUTRAS regras
     const usedCcKeys = new Set();
     (this._ccRulesList || []).forEach(r => {
-      // Se estiver editando, os centros de custo desta regra permanecem disponíveis para edição
-      if (this._editingCcRuleId && r.id === this._editingCcRuleId) return;
+      // Ignora a regra que está sendo editada
+      if (this._editingCcRuleId && String(r.id) === String(this._editingCcRuleId)) return;
 
       if (Array.isArray(r.cost_center_ids)) {
         r.cost_center_ids.forEach(id => {
@@ -3829,15 +3863,44 @@ const AdminPage = {
       }
     });
 
-    const availableCcs = this._ccRuleActiveCcs.filter(c => {
+    const availableCcs = (this._ccRuleActiveCcs || []).filter(c => {
       const idKey = String(c.id).trim().toLowerCase();
       const codeKey = c.code ? String(c.code).trim().toLowerCase() : '';
       const nameKey = c.name ? String(c.name).trim().toLowerCase() : '';
+
+      // Nunca exibir centros descontinuados/inexistentes (ex: 70131 - Vendas)
+      if (idKey === '70131' || codeKey === '70131') return false;
+
+      // Se pertencer à regra que está sendo editada, SEMPRE fica disponível para manter ou desmarcar
+      if (editingCcKeys.has(idKey) || (codeKey && editingCcKeys.has(codeKey)) || (nameKey && editingCcKeys.has(nameKey))) {
+        return true;
+      }
+
       if (usedCcKeys.has(idKey)) return false;
       if (codeKey && usedCcKeys.has(codeKey)) return false;
       if (nameKey && usedCcKeys.has(nameKey)) return false;
       return true;
     });
+
+    // Se a regra em edição tem algum CC que não estava no activeCcs, inclui no checklist
+    if (editingRule && Array.isArray(editingRule.cost_centers)) {
+      editingRule.cost_centers.forEach(ecc => {
+        const eccCode = ecc.code ? String(ecc.code).trim() : '';
+        const eccId = String(ecc.id || eccCode).trim();
+        if (eccCode === '70131' || eccId === '70131') return;
+        const exists = availableCcs.some(c => 
+          String(c.id) === eccId || (c.code && eccCode && String(c.code).trim().toLowerCase() === eccCode.toLowerCase())
+        );
+        if (!exists) {
+          availableCcs.unshift({
+            id: ecc.id || eccCode,
+            code: eccCode || eccId,
+            name: ecc.name || `Centro ${eccCode || eccId}`,
+            active: true
+          });
+        }
+      });
+    }
 
     if (availableCcs.length === 0) {
       container.innerHTML = '<div style="color:var(--text-4);font-size:12px;padding:8px;">Todos os centros de custo ativos já possuem regras cadastradas.</div>';
@@ -3846,7 +3909,7 @@ const AdminPage = {
 
     container.innerHTML = availableCcs.map(c => `
       <label class="cc-item-label" data-text="${escHtml(((c.code ? c.code + ' ' : '') + (c.name || '')).toLowerCase())}" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-1);cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);">
-        <input type="checkbox" class="cc-cost-center-checkbox" value="${c.id}" />
+        <input type="checkbox" class="cc-cost-center-checkbox" value="${c.id}" data-id="${c.id}" data-code="${escHtml(c.code || '')}" data-name="${escHtml(c.name || '')}" />
         <span>${escHtml(c.code ? c.code + ' - ' : '')}${escHtml(c.name)}</span>
       </label>
     `).join('');
@@ -3877,7 +3940,7 @@ const AdminPage = {
   updateCcCcsDropdownLabel() {
     const label = document.getElementById('cc-ccs-dropdown-label');
     if (!label) return;
-    const checked = document.querySelectorAll('.cc-cost-center-checkbox:checked');
+    const checked = Array.from(document.querySelectorAll('.cc-cost-center-checkbox:checked'));
     if (checked.length === 0) {
       label.textContent = 'Selecione os centros de custo...';
       label.style.fontWeight = '500';
@@ -3887,7 +3950,12 @@ const AdminPage = {
       label.textContent = `1 centro de custo selecionado (${ccName.trim()})`;
       label.style.fontWeight = '600';
     } else {
-      label.textContent = `${checked.length} centros de custo selecionados`;
+      const names = checked.map(cb => {
+        const parentLabel = cb.parentElement;
+        return parentLabel ? (parentLabel.querySelector('span')?.textContent || '').trim() : '';
+      }).filter(Boolean);
+      const summary = names.length <= 2 ? names.join(', ') : `${names[0]}, ${names[1]} +${names.length - 2}`;
+      label.textContent = `${checked.length} centros de custo selecionados (${summary})`;
       label.style.fontWeight = '600';
     }
   },
@@ -3924,7 +3992,7 @@ const AdminPage = {
   updateCcUsersDropdownLabel() {
     const label = document.getElementById('cc-users-dropdown-label');
     if (!label) return;
-    const checked = document.querySelectorAll('.cc-user-checkbox:checked');
+    const checked = Array.from(document.querySelectorAll('.cc-user-checkbox:checked'));
     if (checked.length === 0) {
       label.textContent = 'Selecione os usuários permitidos...';
       label.style.fontWeight = '500';
@@ -3934,7 +4002,13 @@ const AdminPage = {
       label.textContent = `1 usuário selecionado (${userName.split('(')[0].trim()})`;
       label.style.fontWeight = '600';
     } else {
-      label.textContent = `${checked.length} usuários selecionados`;
+      const names = checked.map(cb => {
+        const parentLabel = cb.parentElement;
+        const text = parentLabel ? (parentLabel.querySelector('span')?.textContent || '').trim() : '';
+        return text.split('(')[0].trim();
+      }).filter(Boolean);
+      const summary = names.length <= 2 ? names.join(', ') : `${names[0]}, ${names[1]} +${names.length - 2}`;
+      label.textContent = `${checked.length} usuários selecionados (${summary})`;
       label.style.fontWeight = '600';
     }
   },
@@ -3952,30 +4026,49 @@ const AdminPage = {
 
   editCcRule(id) {
     const rules = this._ccRulesList || [];
-    const rule = rules.find(r => r.id === id);
-    if (!rule) return;
+    const rule = rules.find(r => String(r.id) === String(id));
+    if (!rule) {
+      toast('Regra não encontrada para edição.', 'warning');
+      return;
+    }
 
-    this._editingCcRuleId = id;
+    this._editingCcRuleId = rule.id;
+
+    // 1. Re-renderiza o checklist de Centros de Custo liberando os da regra atual
     this.renderCcCcsChecklist();
 
+    // 2. Marca os centros de custo da regra (por ID, código ou nome)
     const allowedCcSet = new Set((rule.cost_center_ids || []).map(c => String(c).trim().toLowerCase()));
     (rule.cost_centers || []).forEach(cc => {
       if (cc.id !== undefined && cc.id !== null) allowedCcSet.add(String(cc.id).trim().toLowerCase());
       if (cc.code) allowedCcSet.add(String(cc.code).trim().toLowerCase());
+      if (cc.name) allowedCcSet.add(String(cc.name).trim().toLowerCase());
     });
     document.querySelectorAll('.cc-cost-center-checkbox').forEach(cb => {
-      cb.checked = allowedCcSet.has(String(cb.value).trim().toLowerCase());
+      const val = String(cb.value).trim().toLowerCase();
+      const code = (cb.dataset.code || '').trim().toLowerCase();
+      const name = (cb.dataset.name || '').trim().toLowerCase();
+      cb.checked = allowedCcSet.has(val) || (code && allowedCcSet.has(code)) || (name && allowedCcSet.has(name));
     });
     this.updateCcCcsDropdownLabel();
 
-    const allowedUserIds = (rule.allowed_user_ids || []).map(u => String(u));
+    // 3. Marca os usuários permitidos da regra (por ID, email ou nome)
+    const allowedUserSet = new Set((rule.allowed_user_ids || []).map(u => String(u).trim().toLowerCase()));
+    (rule.allowed_users || []).forEach(u => {
+      if (u.id !== undefined && u.id !== null) allowedUserSet.add(String(u.id).trim().toLowerCase());
+      if (u.email) allowedUserSet.add(String(u.email).trim().toLowerCase());
+      if (u.name) allowedUserSet.add(String(u.name).trim().toLowerCase());
+    });
     document.querySelectorAll('.cc-user-checkbox').forEach(cb => {
-      cb.checked = allowedUserIds.includes(String(cb.value));
+      const val = String(cb.value).trim().toLowerCase();
+      const email = (cb.dataset.email || '').trim().toLowerCase();
+      cb.checked = allowedUserSet.has(val) || (email && allowedUserSet.has(email));
     });
     this.updateCcUsersDropdownLabel();
 
+    // 4. Atualiza os títulos e botões do formulário
     const formTitle = document.getElementById('cc-form-title');
-    if (formTitle) formTitle.textContent = '✏️ Editar Regra por Centro de Custo';
+    if (formTitle) formTitle.textContent = `✏️ Editar Regra por Centro de Custo #${rule.id}`;
 
     const saveBtn = document.getElementById('btn-save-cc-rule');
     if (saveBtn) saveBtn.textContent = '💾 Atualizar Regra por Centro de Custo';
@@ -3987,13 +4080,34 @@ const AdminPage = {
       cancelBtn.type = 'button';
       cancelBtn.className = 'btn btn-ghost';
       cancelBtn.style.marginRight = '8px';
-      cancelBtn.textContent = 'Cancelar Edição';
+      cancelBtn.textContent = '✕ Cancelar Edição';
       cancelBtn.onclick = () => this.cancelCcRuleEdit();
       saveBtn.parentElement.insertBefore(cancelBtn, saveBtn);
     }
 
-    const formContainer = document.getElementById('cc-form-title');
-    if (formContainer) formContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 5. Garante que a seção do accordion está expandida
+    const sectionBody = document.getElementById('cc-rules-section-body');
+    const sectionBtn = document.getElementById('cc-rules-section-btn');
+    if (sectionBody && sectionBody.style.display === 'none') {
+      sectionBody.style.display = 'flex';
+      if (sectionBtn) {
+        sectionBtn.innerHTML = '<span>▼</span> <span class="cc-sec-txt">Recolher</span>';
+      }
+      if (this._sectionCollapseStates) this._sectionCollapseStates['cc-rules'] = false;
+    }
+
+    // 6. Rola até o formulário e destaca visualmente
+    const formContainer = document.getElementById('cc-form-title')?.parentElement || document.getElementById('cc-form-title');
+    if (formContainer) {
+      formContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      formContainer.style.transition = 'all 0.3s ease';
+      formContainer.style.boxShadow = '0 0 0 3px rgba(26,107,50,0.45)';
+      setTimeout(() => {
+        formContainer.style.boxShadow = '';
+      }, 2000);
+    }
+
+    toast(`Editando regra por centro de custo #${rule.id}`, 'info');
   },
 
   cancelCcRuleEdit() {
@@ -4013,6 +4127,7 @@ const AdminPage = {
 
     document.querySelectorAll('.cc-user-checkbox').forEach(cb => cb.checked = false);
     this.updateCcUsersDropdownLabel();
+    toast('Edição cancelada', 'info');
   },
 
   async saveCcRule() {
@@ -4049,7 +4164,7 @@ const AdminPage = {
       await Api.saveCostCenterRule(payload);
       toast(this._editingCcRuleId ? 'Regra por Centro de Custo atualizada com sucesso!' : 'Regra por Centro de Custo salva com sucesso!', 'success');
       this._editingCcRuleId = null;
-      this.renderPolicies();
+      await this.renderCostCenterRulesSection();
     } catch(err) {
       toast('Erro ao salvar regra: ' + err.message, 'error');
     }
@@ -4060,7 +4175,10 @@ const AdminPage = {
     try {
       await Api.deleteCostCenterRule(id);
       toast('Regra excluída com sucesso!', 'success');
-      this.renderPolicies();
+      if (String(this._editingCcRuleId) === String(id)) {
+        this._editingCcRuleId = null;
+      }
+      await this.renderCostCenterRulesSection();
     } catch(err) {
       toast('Erro ao excluir regra: ' + err.message, 'error');
     }

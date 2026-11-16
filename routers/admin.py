@@ -519,7 +519,10 @@ def list_audit_logs(
 # ─── COST CENTERS ────────────────────────────────────────────────────────────
 @router.get("/cost-centers")
 def list_cost_centers(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
-    all_active_ccs = db.query(models.CostCenter).filter(models.CostCenter.active == True).all()
+    all_active_ccs = [
+        cc for cc in db.query(models.CostCenter).filter(models.CostCenter.active == True).all()
+        if str(cc.code or "").strip() != "70131" and not (str(cc.code or "").strip() == "70131" or (str(cc.name or "").strip().lower() == "vendas" and str(cc.code or "").strip() == "70131"))
+    ]
 
     if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
         return all_active_ccs

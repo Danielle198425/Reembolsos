@@ -495,6 +495,7 @@ const ExpensesPage = {
 
       this.costCenters = Array.from(ccMap.values()).filter(c => {
         if (!c || c.active === false) return false;
+        if (String(c.code || c.id).trim() === '70131') return false;
         const found = localOverrides.find(lc => {
           const lcKey = String(lc.id || lc.code).trim();
           const cCode = String(c.code || '').trim();

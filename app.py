@@ -190,6 +190,13 @@ def run_auto_migrations():
         except Exception as e:
             print(f"[migration] sync user roles sqlite: {e}")
 
+    # Remove centros de custo que não existem / foram descontinuados
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM cost_centers WHERE code = '70131' OR (code = '70131' AND LOWER(name) LIKE '%vendas%');"))
+    except Exception as e:
+        print(f"[migration] delete cost_center 70131: {e}")
+
 
 
 IS_VERCEL = bool(os.environ.get("VERCEL"))

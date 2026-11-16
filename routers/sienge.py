@@ -223,7 +223,15 @@ def get_cost_centers(limit: int = 500, offset: int = 0, db: Session = Depends(ge
                 res_data = json.loads(response.read().decode('utf-8', errors='replace'))
                 results = res_data.get("results", [])
         
-        db_ccs = {str(c.code): c for c in db.query(models.CostCenter).all()}
+        # Filtra centros de custo inexistentes / descontinuados (ex: 70131 - Vendas)
+        results = [
+            cc for cc in results
+            if str(cc.get("id", "")).strip() != "70131"
+            and str(cc.get("code", "")).strip() != "70131"
+            and not (str(cc.get("name", "")).strip().lower() == "vendas" and str(cc.get("id", "")).strip() == "70131")
+        ]
+
+        db_ccs = {str(c.code): c for c in db.query(models.CostCenter).all() if str(c.code) != "70131"}
         companies_by_code = {str(c.code): c.id for c in db.query(models.Company).all()}
         
         for cc in results:
@@ -259,7 +267,7 @@ def sync_cost_centers(db: Session = Depends(get_db)):
         for cc_item in results:
             cc_id_str = str(cc_item.get("id", ""))
             cc_name = cc_item.get("name", "")
-            if not cc_name or not cc_id_str:
+            if not cc_name or not cc_id_str or cc_id_str == "70131":
                 continue
             
             sienge_comp_code = str(cc_item.get("idCompany")) if cc_item.get("idCompany") is not None else None
