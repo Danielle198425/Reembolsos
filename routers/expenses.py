@@ -885,6 +885,12 @@ async def scan_receipt(
         return data
     except HTTPException:
         raise
+    except ValueError as ve:
+        logger.warning(f"Aviso no processamento do comprovante: {ve}")
+        raise HTTPException(
+            status_code=429 if "plano gratuito" in str(ve) else 400,
+            detail=str(ve)
+        )
     except Exception as e:
         logger.error(f"Erro no scan do recibo com Azure Document Intelligence: {e}", exc_info=True)
         raise HTTPException(

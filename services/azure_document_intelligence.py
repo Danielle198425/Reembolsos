@@ -1,62 +1,96 @@
 import os
+import time
 import logging
 from typing import Dict, Any, Optional
 from datetime import date, datetime
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_ENDPOINT = "https://di-reembolsos-mouraleite.cognitiveservices.azure.com/"
+
 _client = None
 
 def get_document_analysis_client():
     """
-    Retorna o DocumentAnalysisClient autenticado via DefaultAzureCredential.
-    Utiliza as credenciais do Microsoft Entra ID configuradas no ambiente
-    (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET) sem necessidade de API Key estática.
+    Retorna o DocumentAnalysisClient autenticado.
+    Prioriza autenticação sem chave estática via Microsoft Entra ID (DefaultAzureCredential).
+    Caso configurada no ambiente (ex: Vercel) a chave AZURE_DOCUMENT_INTELLIGENCE_KEY,
+    utiliza-a como contingência caso o Service Principal ainda esteja pendente de IAM.
     """
     global _client
     if _client is not None:
         return _client
 
-    endpoint = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
+    endpoint = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", DEFAULT_ENDPOINT).strip()
     if not endpoint:
-        raise ValueError(
-            "Variável de ambiente AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT não configurada."
-        )
+        endpoint = DEFAULT_ENDPOINT
 
-    endpoint = endpoint.strip()
     try:
-        from azure.identity import DefaultAzureCredential
         from azure.ai.formrecognizer import DocumentAnalysisClient
+        from azure.core.credentials import AzureKeyCredential
+        from azure.identity import DefaultAzureCredential
+
+        api_key = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
+        if api_key and api_key.strip():
+            _client = DocumentAnalysisClient(endpoint=endpoint, credential=AzureKeyCredential(api_key.strip()))
+            logger.info("Cliente Azure Document Intelligence inicializado com AzureKeyCredential de contingência.")
+            return _client
 
         credential = DefaultAzureCredential()
         _client = DocumentAnalysisClient(endpoint=endpoint, credential=credential)
+        logger.info("Cliente Azure Document Intelligence inicializado com DefaultAzureCredential (Entra ID).")
         return _client
     except Exception as e:
         logger.error(f"Erro ao inicializar cliente do Azure Document Intelligence: {e}")
         raise
 
 
-def analyze_receipt(file_bytes: bytes) -> Dict[str, Any]:
+def analyze_receipt(file_bytes: bytes, max_retries: int = 2) -> Dict[str, Any]:
     """
     Envia o stream de bytes do comprovante/recibo para o modelo pré-treinado 'prebuilt-receipt'
     do Azure AI Document Intelligence e extrai:
       - estabelecimento (MerchantName com fallback para MerchantAddress)
       - data (TransactionDate formatada em YYYY-MM-DD)
       - valorTotal (Total numérico float)
+
+    Trata limitação de taxa (HTTP 429) com retry e mensagem clara para o plano gratuito F0.
+    Não registra dados pessoais extraídos nos logs.
     """
     client = get_document_analysis_client()
 
-    poller = client.begin_analyze_document(
-        model_id="prebuilt-receipt",
-        document=file_bytes
-    )
-    result = poller.result()
+    from azure.core.exceptions import HttpResponseError
+
+    attempt = 0
+    result = None
+
+    while attempt <= max_retries:
+        try:
+            poller = client.begin_analyze_document(
+                model_id="prebuilt-receipt",
+                document=file_bytes
+            )
+            result = poller.result()
+            break
+        except HttpResponseError as err:
+            status_code = getattr(err, "status_code", None)
+            if status_code == 429 and attempt < max_retries:
+                attempt += 1
+                wait_time = attempt * 2
+                logger.warning(f"Limite de taxa (429) no Azure Document Intelligence. Aguardando {wait_time}s para nova tentativa ({attempt}/{max_retries})...")
+                time.sleep(wait_time)
+                continue
+            elif status_code == 429:
+                logger.error("Cota de chamadas/páginas excedida no plano gratuito (F0) do Azure Document Intelligence.")
+                raise ValueError("Limite de leitura de comprovantes (cota do plano gratuito F0) atingido no Azure. Por favor, preencha os dados manualmente.")
+            else:
+                logger.error(f"Erro na API do Azure Document Intelligence (status {status_code}): {err.message if hasattr(err, 'message') else err}")
+                raise
 
     estabelecimento: Optional[str] = None
     data_formatada: Optional[str] = None
     valor_total: float = 0.0
 
-    if result.documents:
+    if result and result.documents:
         receipt = result.documents[0]
         fields = receipt.fields
 
@@ -97,3 +131,5 @@ def analyze_receipt(file_bytes: bytes) -> Dict[str, Any]:
         "data": data_formatada or "",
         "valorTotal": round(valor_total, 2)
     }
+
+
