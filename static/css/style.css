@@ -1902,26 +1902,41 @@ tbody td {
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 8px !important;
     width: 100% !important;
+    align-items: stretch !important;
   }
   .summary-bar .summary-item {
     background: rgba(255, 255, 255, 0.08) !important;
-    padding: 8px 10px !important;
+    padding: 8px 8px !important;
     border-radius: 8px !important;
     min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
   }
   .summary-bar .summary-item-label {
-    font-size: 9px !important;
-    letter-spacing: 0.02em !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    font-size: 8.5px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    letter-spacing: 0.01em !important;
+    text-transform: uppercase !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    color: rgba(255, 255, 255, 0.75) !important;
+    min-height: 32px !important;
+    display: block !important;
   }
   .summary-bar .summary-item-value {
-    font-size: 15px !important;
+    font-size: 14.5px !important;
     font-weight: 800 !important;
     white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    letter-spacing: -0.3px !important;
+    color: #ffffff !important;
   }
 
   /* Tasks card on mobile */
