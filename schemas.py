@@ -372,3 +372,32 @@ class LogoUpdate(BaseModel):
 # ─── Email ───────────────────────────────────────────────────────────────────
 class SendPasswordEmailRequest(BaseModel):
     email: str
+
+
+# ─── UserSavedAddress ────────────────────────────────────────────────────────
+class SavedAddressOut(BaseModel):
+    id: int
+    user_id: int
+    address: str
+    label: Optional[str] = None
+    is_favorite: bool
+    last_used_at: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SavedAddressesResponse(BaseModel):
+    favorites: List[SavedAddressOut]
+    recent: List[SavedAddressOut]
+
+
+class SaveFavoriteRequest(BaseModel):
+    address: str
+    label: Optional[str] = None
+
+
+class AddRecentRequest(BaseModel):
+    address: str
+

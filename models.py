@@ -327,4 +327,19 @@ class EmailTemplate(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class UserSavedAddress(Base):
+    __tablename__ = "user_saved_addresses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    address = Column(Text, nullable=False)
+    label = Column(String(100), nullable=True)
+    is_favorite = Column(Boolean, default=False, nullable=False)
+    last_used_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User", backref="saved_addresses")
+
+
+
 

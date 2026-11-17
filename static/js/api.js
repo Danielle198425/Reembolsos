@@ -263,4 +263,10 @@ const Api = {
     if (!key) throw new Error("Chave do modelo de e-mail não informada.");
     return Api.post(`/api/admin/email-templates/${encodeURIComponent(key)}/send-test`, data);
   },
+
+  // ── Saved Addresses (Quilometragem) ───────────────────────────────────────
+  getSavedAddresses() { return Api.get('/api/users/saved-addresses'); },
+  saveFavoriteAddress(data) { return Api.post('/api/users/saved-addresses/favorite', data); },
+  removeFavoriteAddress(id) { return Api.delete(`/api/users/saved-addresses/favorite/${id}`); },
+  addRecentAddress(data) { return Api.post('/api/users/saved-addresses/recent', data); },
 };

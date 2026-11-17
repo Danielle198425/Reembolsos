@@ -1409,6 +1409,7 @@ const ExpensesPage = {
   async openForm(id = null, opts = {}) {
     await this._loadAux();
     await this.ensureMileageRates();
+    await this.loadSavedAddresses();
 
     let expense = null;
     if (id) {
@@ -1649,6 +1650,7 @@ const ExpensesPage = {
                   value="${escHtml(destVal)}" />
                 <div id="km-dest-suggestions" class="autocomplete-dropdown hidden"></div>
               </div>
+              <div id="km-dest-fav-prompt" class="km-fav-prompt" style="display:none;"></div>
             </div>
             <div class="field required span-2" style="margin-top:8px;">
               <label for="km-notes">📝 Observação da Despesa *</label>
@@ -2603,6 +2605,91 @@ const ExpensesPage = {
 
   /* ── Mileage / Route Calculation ─────────────────────────────────────── */
 
+  _savedAddresses: { favorites: [], recent: [] },
+
+  async loadSavedAddresses() {
+    try {
+      const data = await Api.getSavedAddresses();
+      if (data) {
+        this._savedAddresses = {
+          favorites: data.favorites || [],
+          recent: data.recent || []
+        };
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar endereços salvos:', err);
+      this._savedAddresses = { favorites: [], recent: [] };
+    }
+  },
+
+  _checkDestFavoritePrompt() {
+    const promptEl = document.getElementById('km-dest-fav-prompt');
+    if (!promptEl) return;
+
+    const dest = document.getElementById('km-dest')?.value.trim();
+    if (!dest) {
+      promptEl.style.display = 'none';
+      promptEl.innerHTML = '';
+      return;
+    }
+
+    const normDest = dest.toLowerCase().replace(/\s+/g, ' ');
+    const isFav = (this._savedAddresses?.favorites || []).some(
+      f => f.address.toLowerCase().replace(/\s+/g, ' ') === normDest
+    );
+
+    if (isFav) {
+      promptEl.style.display = 'none';
+      promptEl.innerHTML = '';
+      return;
+    }
+
+    promptEl.style.display = 'block';
+    promptEl.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;width:100%;">
+        <div style="font-size:12.5px;color:#92400e;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:14px;">⭐</span>
+          <span>Deseja salvar este destino como favorito?</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <input type="text" id="km-fav-label-input" placeholder="Rótulo opcional (ex: Cliente A, Filial)" style="font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid #fde68a;background:#fff;width:170px;" />
+          <button type="button" class="btn btn-sm btn-primary" id="btn-save-as-fav" style="font-size:12px;padding:4px 10px;background:#d97706;border-color:#b45309;">
+            ⭐ Salvar Favorito
+          </button>
+        </div>
+      </div>
+    `;
+
+    const saveBtn = document.getElementById('btn-save-as-fav');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const label = document.getElementById('km-fav-label-input')?.value.trim() || null;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Salvando...';
+        try {
+          await Api.saveFavoriteAddress({ address: dest, label });
+          await ExpensesPage.loadSavedAddresses();
+          promptEl.innerHTML = `
+            <div style="font-size:12.5px;color:#15803d;font-weight:600;display:flex;align-items:center;gap:6px;width:100%;">
+              <span>✅</span> Endereço salvo nos seus favoritos com sucesso!
+            </div>
+          `;
+          if (typeof toast === 'function') toast('Endereço adicionado aos favoritos!', 'success');
+          setTimeout(() => {
+            promptEl.style.display = 'none';
+            promptEl.innerHTML = '';
+          }, 3500);
+        } catch (err) {
+          console.warn('Erro ao salvar favorito:', err);
+          saveBtn.disabled = false;
+          saveBtn.textContent = '⭐ Salvar Favorito';
+          if (typeof toast === 'function') toast(err.message || 'Erro ao salvar favorito', 'error');
+        }
+      });
+    }
+  },
+
   _setupKmAddressAutocomplete(inputId, dropdownId) {
     const input = document.getElementById(inputId);
     const dropdown = document.getElementById(dropdownId);
@@ -2610,11 +2697,122 @@ const ExpensesPage = {
 
     let timeoutId = null;
 
+    const bindDropdownEvents = () => {
+      const selectAddr = (e, addr) => {
+        e.preventDefault();
+        e.stopPropagation();
+        input.value = addr;
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+
+        const originVal = document.getElementById('km-origin')?.value.trim();
+        const destVal = document.getElementById('km-dest')?.value.trim();
+        if (originVal && destVal && originVal.toLowerCase() !== destVal.toLowerCase()) {
+          ExpensesPage._calcularRota();
+        }
+      };
+
+      dropdown.querySelectorAll('.autocomplete-item[data-address]').forEach(el => {
+        const addr = el.dataset.address;
+        const onSelect = (e) => {
+          if (e.target.closest('.fav-remove-btn')) return;
+          selectAddr(e, addr);
+        };
+        el.addEventListener('mousedown', onSelect);
+        el.addEventListener('pointerdown', onSelect);
+      });
+
+      dropdown.querySelectorAll('.fav-remove-btn').forEach(btn => {
+        const favId = parseInt(btn.dataset.favId);
+        const onRemove = async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            await Api.removeFavoriteAddress(favId);
+            await ExpensesPage.loadSavedAddresses();
+            showSavedMenu();
+            ExpensesPage._checkDestFavoritePrompt();
+            if (typeof toast === 'function') toast('Endereço removido dos favoritos', 'info');
+          } catch (err) {
+            console.warn('Erro ao remover favorito:', err);
+          }
+        };
+        btn.addEventListener('mousedown', onRemove);
+        btn.addEventListener('pointerdown', onRemove);
+      });
+    };
+
+    const showSavedMenu = () => {
+      if (inputId !== 'km-dest') return false;
+      const favs = ExpensesPage._savedAddresses?.favorites || [];
+      const recents = ExpensesPage._savedAddresses?.recent || [];
+
+      if (favs.length === 0 && recents.length === 0) {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+        return false;
+      }
+
+      let html = '';
+
+      if (favs.length > 0) {
+        html += `<div class="autocomplete-section-header">⭐ Endereços Favoritos</div>`;
+        favs.forEach(f => {
+          const mainTitle = f.label
+            ? `<span class="fav-label-badge">${escHtml(f.label)}</span>${escHtml(f.address.split(',')[0])}`
+            : `⭐ ${escHtml(f.address.split(',')[0])}`;
+
+          html += `
+            <div class="autocomplete-item autocomplete-item-fav" data-address="${escHtml(f.address)}">
+              <div class="fav-main-content">
+                <span class="autocomplete-item-title">${mainTitle}</span>
+                <span class="autocomplete-item-sub">${escHtml(f.address)}</span>
+              </div>
+              <button type="button" class="fav-remove-btn" data-fav-id="${f.id}" title="Remover dos favoritos">✕</button>
+            </div>
+          `;
+        });
+      }
+
+      if (recents.length > 0) {
+        html += `<div class="autocomplete-section-header">🕒 Últimos Endereços (Recentes)</div>`;
+        recents.forEach(r => {
+          html += `
+            <div class="autocomplete-item" data-address="${escHtml(r.address)}">
+              <span class="autocomplete-item-title">🕒 ${escHtml(r.address.split(',')[0])}</span>
+              <span class="autocomplete-item-sub">${escHtml(r.address)}</span>
+            </div>
+          `;
+        });
+      }
+
+      dropdown.innerHTML = html;
+      dropdown.classList.remove('hidden');
+      bindDropdownEvents();
+      return true;
+    };
+
+    if (inputId === 'km-dest') {
+      input.addEventListener('focus', () => {
+        if (input.value.trim().length < 3) {
+          showSavedMenu();
+        }
+      });
+      input.addEventListener('click', () => {
+        if (input.value.trim().length < 3) {
+          showSavedMenu();
+        }
+      });
+    }
+
     input.addEventListener('input', (e) => {
       clearTimeout(timeoutId);
       const query = e.target.value.trim();
 
       if (query.length < 3) {
+        if (inputId === 'km-dest' && showSavedMenu()) {
+          return;
+        }
         dropdown.innerHTML = '';
         dropdown.classList.add('hidden');
         return;
@@ -2622,6 +2820,47 @@ const ExpensesPage = {
 
       timeoutId = setTimeout(async () => {
         try {
+          let savedMatchesHtml = '';
+          if (inputId === 'km-dest') {
+            const qLower = query.toLowerCase();
+            const matchedFavs = (ExpensesPage._savedAddresses?.favorites || []).filter(
+              f => (f.label && f.label.toLowerCase().includes(qLower)) || f.address.toLowerCase().includes(qLower)
+            );
+            const matchedRecents = (ExpensesPage._savedAddresses?.recent || []).filter(
+              r => r.address.toLowerCase().includes(qLower)
+            );
+
+            if (matchedFavs.length > 0) {
+              savedMatchesHtml += `<div class="autocomplete-section-header">⭐ Favoritos Correspondentes</div>`;
+              matchedFavs.forEach(f => {
+                const mainTitle = f.label
+                  ? `<span class="fav-label-badge">${escHtml(f.label)}</span>${escHtml(f.address.split(',')[0])}`
+                  : `⭐ ${escHtml(f.address.split(',')[0])}`;
+                savedMatchesHtml += `
+                  <div class="autocomplete-item autocomplete-item-fav" data-address="${escHtml(f.address)}">
+                    <div class="fav-main-content">
+                      <span class="autocomplete-item-title">${mainTitle}</span>
+                      <span class="autocomplete-item-sub">${escHtml(f.address)}</span>
+                    </div>
+                    <button type="button" class="fav-remove-btn" data-fav-id="${f.id}" title="Remover dos favoritos">✕</button>
+                  </div>
+                `;
+              });
+            }
+
+            if (matchedRecents.length > 0) {
+              savedMatchesHtml += `<div class="autocomplete-section-header">🕒 Recentes Correspondentes</div>`;
+              matchedRecents.forEach(r => {
+                savedMatchesHtml += `
+                  <div class="autocomplete-item" data-address="${escHtml(r.address)}">
+                    <span class="autocomplete-item-title">🕒 ${escHtml(r.address.split(',')[0])}</span>
+                    <span class="autocomplete-item-sub">${escHtml(r.address)}</span>
+                  </div>
+                `;
+              });
+            }
+          }
+
           const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=br&limit=10&addressdetails=1`;
           const res = await fetch(url, {
             headers: {
@@ -2631,55 +2870,48 @@ const ExpensesPage = {
           });
           const items = await res.json();
 
-          if (!items || items.length === 0) {
+          if ((!items || items.length === 0) && !savedMatchesHtml) {
             dropdown.innerHTML = `<div class="autocomplete-item" style="cursor:default;color:var(--text-4);"><span class="autocomplete-item-title">Nenhum endereço encontrado</span></div>`;
             dropdown.classList.remove('hidden');
             return;
           }
 
-          dropdown.innerHTML = items.map(item => {
-            const addr = item.address || {};
-            const mainName = addr.road || addr.pedestrian || addr.highway || addr.amenity || item.display_name.split(',')[0];
-            
-            const neighborhood = addr.suburb || addr.neighbourhood || addr.city_district || '';
-            const city = addr.city || addr.town || addr.municipality || addr.village || '';
-            const state = addr.state || '';
+          let searchResultsHtml = '';
+          if (items && items.length > 0) {
+            if (savedMatchesHtml) {
+              searchResultsHtml += `<div class="autocomplete-section-header">📍 Outros Resultados Encontrados</div>`;
+            }
+            searchResultsHtml += items.map(item => {
+              const addr = item.address || {};
+              const mainName = addr.road || addr.pedestrian || addr.highway || addr.amenity || item.display_name.split(',')[0];
+              
+              const neighborhood = addr.suburb || addr.neighbourhood || addr.city_district || '';
+              const city = addr.city || addr.town || addr.municipality || addr.village || '';
+              const state = addr.state || '';
 
-            const parts = [];
-            if (neighborhood) parts.push(neighborhood);
-            if (city) parts.push(city);
-            if (state) parts.push(state.length > 2 ? state : state.toUpperCase());
+              const parts = [];
+              if (neighborhood) parts.push(neighborhood);
+              if (city) parts.push(city);
+              if (state) parts.push(state.length > 2 ? state : state.toUpperCase());
 
-            const subText = parts.join(' • ') || item.display_name;
+              const subText = parts.join(' • ') || item.display_name;
 
-            let cleanAddress = item.display_name
-              .replace(/, Região [^,]+/g, '')
-              .replace(/, Brasil/g, '')
-              .replace(/, [0-9]{5}-[0-9]{3}/g, '');
+              let cleanAddress = item.display_name
+                .replace(/, Região [^,]+/g, '')
+                .replace(/, Brasil/g, '')
+                .replace(/, [0-9]{5}-[0-9]{3}/g, '');
 
-            return `
-              <div class="autocomplete-item" data-address="${escHtml(cleanAddress)}">
-                <span class="autocomplete-item-title">📍 ${escHtml(mainName)}</span>
-                <span class="autocomplete-item-sub">${escHtml(subText)}</span>
-              </div>`;
-          }).join('');
+              return `
+                <div class="autocomplete-item" data-address="${escHtml(cleanAddress)}">
+                  <span class="autocomplete-item-title">📍 ${escHtml(mainName)}</span>
+                  <span class="autocomplete-item-sub">${escHtml(subText)}</span>
+                </div>`;
+            }).join('');
+          }
 
+          dropdown.innerHTML = savedMatchesHtml + searchResultsHtml;
           dropdown.classList.remove('hidden');
-
-          dropdown.querySelectorAll('.autocomplete-item[data-address]').forEach(el => {
-            el.addEventListener('click', (ev) => {
-              ev.stopPropagation();
-              input.value = el.dataset.address;
-              dropdown.classList.add('hidden');
-              dropdown.innerHTML = '';
-
-              const originVal = document.getElementById('km-origin')?.value.trim();
-              const destVal = document.getElementById('km-dest')?.value.trim();
-              if (originVal && destVal && originVal.toLowerCase() !== destVal.toLowerCase()) {
-                ExpensesPage._calcularRota();
-              }
-            });
-          });
+          bindDropdownEvents();
 
         } catch (err) {
           console.warn('Erro na busca de endereços:', err);
@@ -2847,6 +3079,7 @@ const ExpensesPage = {
 
 
       toast(`Rota calculada: ${distKm.toFixed(1)} km • ${fmt(total)}`, 'success');
+      this._checkDestFavoritePrompt();
     } catch (err) {
       errEl.textContent = 'Erro ao calcular rota: ' + err.message;
     } finally {
@@ -3055,6 +3288,9 @@ const ExpensesPage = {
         } else {
           toast('Rascunho salvo!', 'success');
         }
+      }
+      if (isKm && this._kmData && this._kmData.dest) {
+        Api.addRecentAddress({ address: this._kmData.dest }).catch(e => console.warn('Erro ao salvar endereço recente:', e));
       }
       Modal.close();
       this.loadExpenses();
