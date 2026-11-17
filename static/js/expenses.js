@@ -1666,7 +1666,7 @@ const ExpensesPage = {
           <button class="btn btn-secondary" type="button"
             id="km-calc-btn"
             style="margin-top:12px;width:100%;justify-content:center;gap:8px;">
-            🗺️ Calcular Rota via OpenStreetMap
+            🗺️ Calcular Rota
           </button>
 
 
@@ -1749,21 +1749,15 @@ const ExpensesPage = {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
           try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
-              headers: {
-                'Accept-Language': 'pt-BR',
-                'User-Agent': 'MouraLeiteReembolsos/1.0 (reembolsos@mouraleite.com.br)'
-              }
-            });
-            const data = await res.json();
-            if (data && data.display_name) {
-              document.getElementById('km-origin').value = data.display_name;
+            const data = await Api.mapsReverse(lat, lon);
+            if (data && data.formatted_address) {
+              document.getElementById('km-origin').value = data.formatted_address;
               toast('Posição localizada com sucesso!', 'success');
             } else {
               toast('Não foi possível obter o endereço para sua posição.', 'warning');
             }
           } catch (err) {
-            console.error('Erro na engenharia reversa do Nominatim:', err);
+            console.error('Erro na engenharia reversa de mapas:', err);
             toast('Erro ao buscar endereço da sua posição.', 'error');
           } finally {
             btn.disabled = false;
@@ -2861,14 +2855,8 @@ const ExpensesPage = {
             }
           }
 
-          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=br&limit=10&addressdetails=1`;
-          const res = await fetch(url, {
-            headers: {
-              'Accept-Language': 'pt-BR',
-              'User-Agent': 'MouraLeiteReembolsos/1.0 (reembolsos@mouraleite.com.br)'
-            }
-          });
-          const items = await res.json();
+          const searchData = await Api.mapsSearch(query, 7);
+          const items = searchData?.results || [];
 
           if ((!items || items.length === 0) && !savedMatchesHtml) {
             dropdown.innerHTML = `<div class="autocomplete-item" style="cursor:default;color:var(--text-4);"><span class="autocomplete-item-title">Nenhum endereço encontrado</span></div>`;
@@ -2882,24 +2870,9 @@ const ExpensesPage = {
               searchResultsHtml += `<div class="autocomplete-section-header">📍 Outros Resultados Encontrados</div>`;
             }
             searchResultsHtml += items.map(item => {
-              const addr = item.address || {};
-              const mainName = addr.road || addr.pedestrian || addr.highway || addr.amenity || item.display_name.split(',')[0];
-              
-              const neighborhood = addr.suburb || addr.neighbourhood || addr.city_district || '';
-              const city = addr.city || addr.town || addr.municipality || addr.village || '';
-              const state = addr.state || '';
-
-              const parts = [];
-              if (neighborhood) parts.push(neighborhood);
-              if (city) parts.push(city);
-              if (state) parts.push(state.length > 2 ? state : state.toUpperCase());
-
-              const subText = parts.join(' • ') || item.display_name;
-
-              let cleanAddress = item.display_name
-                .replace(/, Região [^,]+/g, '')
-                .replace(/, Brasil/g, '')
-                .replace(/, [0-9]{5}-[0-9]{3}/g, '');
+              const mainName = item.main_name || (item.formatted_address || '').split(',')[0];
+              const subText = item.sub_text || item.formatted_address || '';
+              const cleanAddress = item.formatted_address || mainName;
 
               return `
                 <div class="autocomplete-item" data-address="${escHtml(cleanAddress)}">
@@ -2956,42 +2929,19 @@ const ExpensesPage = {
 
 
     try {
-      // Geocode both endpoints via Nominatim
-      const [geoA, geoB] = await Promise.all([
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(origin)}&limit=1`, {
-          headers: {
-            'Accept-Language': 'pt-BR',
-            'User-Agent': 'MouraLeiteReembolsos/1.0 (reembolsos@mouraleite.com.br)'
-          }
-        }).then(r => r.json()),
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(dest)}&limit=1`, {
-          headers: {
-            'Accept-Language': 'pt-BR',
-            'User-Agent': 'MouraLeiteReembolsos/1.0 (reembolsos@mouraleite.com.br)'
-          }
-        }).then(r => r.json()),
-      ]);
+      // Cálculo de rota via Azure Maps (com fallback automático se não configurado)
+      const routeRes = await Api.mapsRoute({ origin, dest });
+      if (!routeRes || !routeRes.distance_km) {
+        errEl.textContent = 'Não foi possível calcular a rota para os endereços informados.';
+        return;
+      }
 
+      const distKm = parseFloat(routeRes.distance_km);
+      if (distKm < 1) { errEl.textContent = 'Distância mínima: 1 km.'; return; }
 
-      if (!geoA.length) { errEl.textContent = `Endereço não encontrado: "${origin}"`; return; }
-      if (!geoB.length) { errEl.textContent = `Endereço não encontrado: "${dest}"`; return; }
-
-
-      const latA = parseFloat(geoA[0].lat), lonA = parseFloat(geoA[0].lon);
-      const latB = parseFloat(geoB[0].lat), lonB = parseFloat(geoB[0].lon);
-
-
-      // Route via OSRM (free, no key needed)
-      const routeRes = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${lonA},${latA};${lonB},${latB}?overview=full&geometries=geojson`
-      ).then(r => r.json());
-
-
-      if (!routeRes.routes?.length) { errEl.textContent = 'Não foi possível calcular a rota.'; return; }
-
-
-      const distM  = routeRes.routes[0].distance;          // metres
-      const distKm = distM / 1000;
+      const latA = routeRes.origin_coords[0], lonA = routeRes.origin_coords[1];
+      const latB = routeRes.dest_coords[0], lonB = routeRes.dest_coords[1];
+      const geojson = routeRes.geojson;
 
 
       if (distKm < 1) { errEl.textContent = 'Distância mínima: 1 km.'; return; }
@@ -3053,8 +3003,7 @@ const ExpensesPage = {
 
 
       // Draw GeoJSON route polyline
-      const geojson = routeRes.routes[0].geometry;
-      const poly    = L.geoJSON(geojson, {
+      const poly = L.geoJSON(geojson, {
         style: { color: '#4F46E5', weight: 4, opacity: 0.85 },
       }).addTo(lmap);
 

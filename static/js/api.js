@@ -269,4 +269,15 @@ const Api = {
   saveFavoriteAddress(data) { return Api.post('/api/users/saved-addresses/favorite', data); },
   removeFavoriteAddress(id) { return Api.delete(`/api/users/saved-addresses/favorite/${id}`); },
   addRecentAddress(data) { return Api.post('/api/users/saved-addresses/recent', data); },
+
+  // ── Azure Maps (Geocoding, Autocomplete & Rotas) ─────────────────────────
+  mapsSearch(q, limit = 5) {
+    return Api.get(`/api/maps/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+  },
+  mapsReverse(lat, lon) {
+    return Api.get(`/api/maps/reverse?lat=${lat}&lon=${lon}`);
+  },
+  mapsRoute(data) {
+    return Api.post('/api/maps/route', data);
+  },
 };

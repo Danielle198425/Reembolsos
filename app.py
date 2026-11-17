@@ -9,7 +9,7 @@ from sqlalchemy import inspect, text
 from database import engine, Base, SessionLocal, IS_SQLITE
 import models
 import storage
-from routers import auth, dashboard, expenses, exports, admin, sienge, users
+from routers import auth, dashboard, expenses, exports, admin, sienge, users, maps
 from seed import run_seed
 
 # Tipos compatíveis entre SQLite e Postgres
@@ -328,6 +328,7 @@ app.include_router(exports.router)
 app.include_router(admin.router)
 app.include_router(sienge.router)
 app.include_router(users.router)
+app.include_router(maps.router)
 
 # Static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
