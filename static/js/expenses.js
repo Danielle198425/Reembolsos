@@ -1475,209 +1475,243 @@ const ExpensesPage = {
 
 
     const isFormImpersonated = Boolean(sessionStorage.getItem('ml_impersonator_token'));
+    const isNewReceiptExpense = !id && !opts.forceKm;
 
     const html = `
-      <div class="form-grid">
-        ${isFormImpersonated ? `
-        <div class="field span-2" style="background:#eef2ff;border:1.5px solid #c7d2fe;border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px;">
-          <span style="font-size:24px;">👁️</span>
-          <div style="font-size:13px;color:#3730a3;line-height:1.4;">
-            <strong>Modo "Ver como" ativo:</strong> Esta despesa será vinculada ao perfil de <strong>${escHtml(App.user?.name || 'Usuário')}</strong> e constará registrada com o alerta de lançamento pelo Administrador.
-          </div>
-        </div>` : ''}
-        <div class="field span-2 required" id="ef-receipt-wrap">
-          <label style="font-weight:600;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <span>Comprovante (Foto ou PDF)</span>
-            <span id="receipt-status-badge" style="display:${expense?.receipt_path ? 'inline-block' : 'none'};font-size:12px;color:var(--ml-indigo);font-weight:700;">✅ Anexado</span>
-          </label>
+      <!-- ETAPA 1: Visor da Câmera com Auto-Capture Inteligente -->
+      <div id="camera-step-wrap" style="display:${isNewReceiptExpense ? 'block' : 'none'};">
+        <div class="camera-step-container">
+          <div class="camera-viewport-wrap" id="camera-viewport-wrap">
+            <video id="camera-video-preview" class="camera-video-elem" autoplay playsinline muted></video>
+            
+            <div class="camera-status-pill" id="camera-status-pill">
+              🎯 Aponte para o cupom dentro da moldura
+            </div>
 
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button type="button" id="btn-take-photo" class="btn btn-secondary btn-sm show-on-mobile" style="align-items:center;gap:6px;padding:8px 14px;font-size:13px;border-radius:8px;font-weight:600;">
-              📷 Tirar Foto
+            <div class="camera-guide-overlay">
+              <div class="camera-guide-box state-searching" id="camera-guide-box">
+                <div class="camera-corner top-left"></div>
+                <div class="camera-corner top-right"></div>
+                <div class="camera-corner bottom-left"></div>
+                <div class="camera-corner bottom-right"></div>
+              </div>
+            </div>
+
+            <div class="camera-flash-overlay" id="camera-flash-overlay"></div>
+          </div>
+
+          <div class="camera-actions-bar">
+            <button type="button" id="btn-manual-capture" class="btn camera-btn-capture">
+              📸 Capturar Agora
             </button>
-            <button type="button" id="btn-pick-file" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;border-radius:8px;font-weight:600;">
+            <button type="button" id="btn-camera-gallery" class="btn btn-secondary camera-btn-gallery">
               📁 Escolher Arquivo / Galeria
             </button>
           </div>
 
-          <input type="file" id="ef-receipt-camera" accept="image/*" capture="environment" style="display:none;" />
-          <input type="file" id="ef-receipt-gallery" accept="image/jpeg,image/png,image/webp,application/pdf" style="display:none;" />
-          <input type="file" id="ef-receipt" style="display:none;" />
+          <a href="javascript:void(0)" id="btn-skip-photo" class="camera-manual-link">
+            ✍️ Preencher manualmente sem foto
+          </a>
+        </div>
+      </div>
 
-          <div id="camera-modal-container" style="display:none;margin-top:10px;background:#000;border-radius:12px;overflow:hidden;position:relative;">
-            <video id="camera-video-preview" autoplay playsinline style="width:100%;max-height:280px;object-fit:cover;display:block;"></video>
-            <div style="display:flex;justify-content:center;gap:12px;padding:10px;background:rgba(0,0,0,0.7);position:absolute;bottom:0;left:0;right:0;z-index:10;">
-              <button type="button" id="btn-capture-camera" class="btn btn-primary" style="background:var(--ml-indigo);color:#fff;padding:6px 18px;border-radius:20px;font-size:13px;font-weight:600;">
-                📸 Capturar Foto
+      <!-- ETAPA 2: Formulário com Dados da Despesa -->
+      <div id="expense-fields-step" style="display:${isNewReceiptExpense ? 'none' : 'block'};">
+        <div class="form-grid">
+          ${isFormImpersonated ? `
+          <div class="field span-2" style="background:#eef2ff;border:1.5px solid #c7d2fe;border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+            <span style="font-size:24px;">👁️</span>
+            <div style="font-size:13px;color:#3730a3;line-height:1.4;">
+              <strong>Modo "Ver como" ativo:</strong> Esta despesa será vinculada ao perfil de <strong>${escHtml(App.user?.name || 'Usuário')}</strong> e constará registrada com o alerta de lançamento pelo Administrador.
+            </div>
+          </div>` : ''}
+
+          <div class="field span-2 required" id="ef-receipt-wrap">
+            <label style="font-weight:600;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span>Comprovante (Foto ou PDF)</span>
+              <span id="receipt-status-badge" style="display:${expense?.receipt_path ? 'inline-block' : 'none'};font-size:12px;color:var(--ml-indigo);font-weight:700;">✅ Anexado</span>
+            </label>
+
+            <div id="receipt-upload-buttons" style="display:${expense?.receipt_path ? 'none' : 'flex'};gap:10px;flex-wrap:wrap;">
+              <button type="button" id="btn-step2-retake" class="btn btn-secondary btn-sm show-on-mobile" style="align-items:center;gap:6px;padding:8px 14px;font-size:13px;border-radius:8px;font-weight:600;">
+                📷 Abrir Câmera
               </button>
-              <button type="button" id="btn-cancel-camera" class="btn btn-ghost" style="color:#fff;padding:6px 14px;font-size:13px;">
-                Cancelar
+              <button type="button" id="btn-pick-file" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;border-radius:8px;font-weight:600;">
+                📁 Escolher Arquivo / Galeria
               </button>
             </div>
-          </div>
 
-          <div id="receipt-preview-box" style="display:${expense?.receipt_path ? 'flex' : 'none'};margin-top:10px;padding:10px 14px;background:var(--bg-hover,#F8FAFC);border:1px solid var(--border,#E2E8F0);border-radius:10px;align-items:center;justify-content:space-between;gap:10px;">
-            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-              <img id="receipt-thumb" src="${(expense?.receipt_path && !expense.receipt_path.toLowerCase().endsWith('.pdf')) ? (expense.receipt_path.startsWith('http') ? expense.receipt_path : `/uploads/${expense.receipt_path}`) : ''}" style="width:42px;height:42px;object-fit:cover;border-radius:6px;display:${(expense?.receipt_path && !expense.receipt_path.toLowerCase().endsWith('.pdf')) ? 'block' : 'none'};border:1px solid var(--border);" />
-              <span id="receipt-pdf-icon" style="font-size:24px;display:${(expense?.receipt_path && expense.receipt_path.toLowerCase().endsWith('.pdf')) ? 'inline-block' : 'none'};">📄</span>
-              <div style="min-width:0;">
-                <div id="receipt-filename" style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-1);">${escHtml(expense?.receipt_path ? expense.receipt_path.split('/').pop() : '')}</div>
-                <div id="receipt-filesize" style="font-size:11px;color:var(--text-3);">${expense?.receipt_path ? 'Comprovante salvo' : ''}</div>
+            <input type="file" id="ef-receipt-gallery" accept="image/jpeg,image/png,image/webp,application/pdf" style="display:none;" />
+            <input type="file" id="ef-receipt" style="display:none;" />
+
+            <div id="receipt-preview-box" style="display:${expense?.receipt_path ? 'flex' : 'none'};margin-top:10px;padding:10px 14px;background:var(--bg-hover,#F8FAFC);border:1px solid var(--border,#E2E8F0);border-radius:10px;align-items:center;justify-content:space-between;gap:10px;">
+              <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                <img id="receipt-thumb" src="${(expense?.receipt_path && !expense.receipt_path.toLowerCase().endsWith('.pdf')) ? (expense.receipt_path.startsWith('http') ? expense.receipt_path : `/uploads/${expense.receipt_path}`) : ''}" style="width:42px;height:42px;object-fit:cover;border-radius:6px;display:${(expense?.receipt_path && !expense.receipt_path.toLowerCase().endsWith('.pdf')) ? 'block' : 'none'};border:1px solid var(--border);" />
+                <span id="receipt-pdf-icon" style="font-size:24px;display:${(expense?.receipt_path && expense.receipt_path.toLowerCase().endsWith('.pdf')) ? 'inline-block' : 'none'};">📄</span>
+                <div style="min-width:0;">
+                  <div id="receipt-filename" style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-1);">${escHtml(expense?.receipt_path ? expense.receipt_path.split('/').pop() : '')}</div>
+                  <div id="receipt-filesize" style="font-size:11px;color:var(--text-3);">${expense?.receipt_path ? 'Comprovante salvo' : ''}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" id="btn-retake-photo" class="btn btn-sm btn-secondary" style="font-size:12px;padding:5px 10px;display:inline-flex;align-items:center;gap:4px;">
+                  🔄 Refazer Foto
+                </button>
+                <button type="button" id="btn-remove-receipt" class="btn btn-sm btn-ghost" style="color:var(--red);font-size:12px;padding:5px 8px;" title="Remover comprovante">✕ Remover</button>
               </div>
             </div>
-            <button type="button" id="btn-remove-receipt" class="btn btn-sm btn-ghost" style="color:var(--red);font-size:12px;padding:4px 8px;" title="Remover comprovante">✕ Remover</button>
-          </div>
 
-          <div id="ocr-loading" style="display:none;font-size:12px;color:var(--ml-indigo);margin-top:6px;">
-            <span class="spinner" style="width:12px;height:12px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:4px;"></span>
-            Lendo comprovante com IA...
-          </div>
-
-          <div id="audit-alerts-banner" style="display:${(expense?.audit_alerts && expense.audit_alerts.length > 0) ? 'block' : 'none'};margin-top:12px;padding:12px 14px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13px;">
-            <div style="font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-              <span style="font-size:16px;">⚠️</span> Alertas de Auditoria do Comprovante
+            <div id="ocr-loading" style="display:none;font-size:13px;color:var(--ml-indigo);margin-top:10px;padding:10px 14px;background:#eef2ff;border-radius:8px;border:1px solid #c7d2fe;">
+              <span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:8px;"></span>
+              <strong>Lendo comprovante com IA do Azure...</strong> Extraindo dados e auditando irregularidades...
             </div>
-            <ul id="audit-alerts-list" style="margin:0;padding-left:20px;line-height:1.5;">
-              ${(expense?.audit_alerts && expense.audit_alerts.length > 0) ? expense.audit_alerts.map(a => `<li>${escHtml(a)}</li>`).join('') : ''}
-            </ul>
-            <div style="font-size:11.5px;color:#7f1d1d;margin-top:6px;">
-              Você ainda pode submeter a despesa caso se trate de uma justificativa autorizada ou falso positivo, mas as informações de auditoria ficarão registradas para análise do aprovador e do financeiro.
+
+            <div id="audit-alerts-banner" style="display:${(expense?.audit_alerts && expense.audit_alerts.length > 0) ? 'block' : 'none'};margin-top:12px;padding:12px 14px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13px;">
+              <div style="font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <span style="font-size:16px;">⚠️</span> Alertas de Auditoria do Comprovante
+              </div>
+              <ul id="audit-alerts-list" style="margin:0;padding-left:20px;line-height:1.5;">
+                ${(expense?.audit_alerts && expense.audit_alerts.length > 0) ? expense.audit_alerts.map(a => `<li>${escHtml(a)}</li>`).join('') : ''}
+              </ul>
+              <div style="font-size:11.5px;color:#7f1d1d;margin-top:6px;">
+                Você ainda pode submeter a despesa caso se trate de uma justificativa autorizada ou falso positivo, mas as informações de auditoria ficarão registradas para análise do aprovador e do financeiro.
+              </div>
+            </div>
+          </div>
+          <div class="field span-2 required" id="ef-provider-wrap">
+            <label for="ef-provider">Fornecedor</label>
+            <input type="text" id="ef-provider" placeholder="Nome do local / fornecedor" value="${escHtml(expense?.provider || '')}" />
+          </div>
+          <div class="field required">
+            <label for="ef-category">Categoria${opts.forceKm ? ' <span style="font-size:11px;color:var(--ml-pink,#e91e8c);font-weight:700;">🔒 fixado</span>' : ''}</label>
+            <select id="ef-category" onchange="ExpensesPage._onCategoryChange()" ${opts.forceKm ? 'disabled style="opacity:.75;cursor:not-allowed;"' : ''}>
+              <option value="">Selecione...</option>
+              ${cats.map(c => `<option value="${c.id}"
+                data-limit="${c.daily_limit || ''}"
+                data-nf="${c.requires_nf}"
+                data-maxdays="${c.max_days || ''}"
+                data-name="${escHtml(c.name)}"
+                ${(opts.forceKm && c.name.toLowerCase().includes('quilometragem')) ? 'selected' : (expense?.category_id === c.id ? 'selected' : '')}
+              >${escHtml(c.icon)} ${escHtml(c.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field required">
+            <label for="ef-cc">Centro de Custo</label>
+            <select id="ef-cc">
+              <option value="">Selecione...</option>
+              ${ccs.map(cc => `<option value="${cc.id}" ${String(expense?.cost_center_id) === String(cc.id) ? 'selected' : ''}>${cc.code ? escHtml(cc.code) + ' | ' : ''}${escHtml(cc.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field required">
+            <label for="ef-date">Data da Despesa</label>
+            <input type="date" id="ef-date" value="${expense?.expense_date || new Date().toISOString().slice(0,10)}" />
+          </div>
+
+
+          <!-- Campos padrão (ocultos quando Quilometragem) -->
+          <div class="field required" id="ef-amount-wrap">
+            <label for="ef-amount">Valor (R$)</label>
+            <input type="text" id="ef-amount" placeholder="R$ 0,00" value="${expense?.amount ? expense.amount.toFixed(2).replace('.', ',') : ''}" />
+          </div>
+          <div class="field span-2 required" id="ef-desc-wrap">
+            <label for="ef-description">Descrição</label>
+            <textarea id="ef-description" rows="3" placeholder="Descreva a despesa..." maxlength="500" style="width:100%;min-height:75px;resize:vertical;">${escHtml(expense?.description || '')}</textarea>
+          </div>
+        </div>
+
+
+        <!-- Bloco Quilometragem (oculto por padrão) -->
+        <div id="km-block" style="display:none;margin-top:12px;">
+          <div class="form-grid">
+            <div class="field required span-2">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
+                <label for="km-origin" style="margin:0;">📍 Ponto Inicial</label>
+                <button class="btn btn-ghost btn-sm" type="button" id="btn-locate-origin" style="padding: 2px 6px; font-size: 12px; font-weight: 600; color: var(--ml-indigo); display: flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 4px; background: white; cursor: pointer; transition: 0.2s;">
+                  📍 Localizar minha posição
+                </button>
+              </div>
+              <div style="position:relative; width:100%;">
+                <input type="text" id="km-origin"
+                  style="width:100%;"
+                  placeholder="Ex: Avenida Vital Brasil, São Paulo, SP"
+                  autocomplete="off"
+                  value="${escHtml(originVal)}" />
+                <div id="km-origin-suggestions" class="autocomplete-dropdown hidden"></div>
+              </div>
+            </div>
+            <div class="field required span-2">
+              <label for="km-dest">🏁 Ponto Final</label>
+              <div style="position:relative; width:100%;">
+                <input type="text" id="km-dest"
+                  style="width:100%;"
+                  placeholder="Ex: Rua Emílio Trevisani, 50, Bauru, SP"
+                  autocomplete="off"
+                  value="${escHtml(destVal)}" />
+                <div id="km-dest-suggestions" class="autocomplete-dropdown hidden"></div>
+              </div>
+            </div>
+            <div class="field required span-2" style="margin-top:8px;">
+              <label for="km-notes">📝 Observação da Despesa *</label>
+              <textarea id="km-notes" rows="2" placeholder="Informe a observação / motivo do deslocamento..." style="width:100%;" required>${escHtml(kmNotesVal)}</textarea>
+            </div>
+            <div class="field span-2" style="display:flex;align-items:center;gap:10px;margin-top:10px;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e2e8f0;">
+              <input type="checkbox" id="km-roundtrip" style="width:18px!important;height:18px!important;min-width:18px;min-height:18px;margin:0!important;cursor:pointer;flex-shrink:0;" ${roundTripVal ? 'checked' : ''} />
+              <label for="km-roundtrip" style="font-weight:600;margin:0;cursor:pointer;font-size:13.5px;color:var(--text-1);line-height:1.3;">🔄 Trajeto de ida e volta (dobrar valor)</label>
+            </div>
+          </div>
+
+
+          <button class="btn btn-secondary" type="button"
+            id="km-calc-btn"
+            style="margin-top:12px;width:100%;justify-content:center;gap:8px;">
+            🗺️ Calcular Rota via OpenStreetMap
+          </button>
+
+
+          <p id="km-error" style="color:var(--red);font-size:13px;margin-top:6px;"></p>
+
+
+          <!-- Leaflet map -->
+          <div id="km-map"
+            style="height:240px;margin-top:14px;border-radius:10px;overflow:hidden;
+                   border:1.5px solid var(--border);display:none;">
+          </div>
+
+
+          <!-- Resultados calculados -->
+          <div id="km-results" style="display:none;margin-top:14px;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+              <div class="detail-section" style="text-align:center;padding:14px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Distância</div>
+                <div style="font-size:20px;font-weight:800;color:var(--text-1);" id="km-dist">—</div>
+              </div>
+              <div class="detail-section" style="text-align:center;padding:14px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Valor/km</div>
+                <div style="font-size:20px;font-weight:800;color:var(--text-1);" id="km-rate">—</div>
+              </div>
+              <div class="detail-section" style="text-align:center;padding:14px;background:var(--ml-light);">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ml-indigo);margin-bottom:4px;">Total</div>
+                <div style="font-size:20px;font-weight:800;color:var(--ml-indigo);" id="km-total">—</div>
+              </div>
             </div>
           </div>
         </div>
-        <div class="field span-2 required" id="ef-provider-wrap">
-          <label for="ef-provider">Fornecedor</label>
-          <input type="text" id="ef-provider" placeholder="Nome do local / fornecedor" value="${escHtml(expense?.provider || '')}" />
-        </div>
-        <div class="field required">
-          <label for="ef-category">Categoria${opts.forceKm ? ' <span style="font-size:11px;color:var(--ml-pink,#e91e8c);font-weight:700;">🔒 fixado</span>' : ''}</label>
-          <select id="ef-category" onchange="ExpensesPage._onCategoryChange()" ${opts.forceKm ? 'disabled style="opacity:.75;cursor:not-allowed;"' : ''}>
-            <option value="">Selecione...</option>
-            ${cats.map(c => `<option value="${c.id}"
-              data-limit="${c.daily_limit || ''}"
-              data-nf="${c.requires_nf}"
-              data-maxdays="${c.max_days || ''}"
-              data-name="${escHtml(c.name)}"
-              ${(opts.forceKm && c.name.toLowerCase().includes('quilometragem')) ? 'selected' : (expense?.category_id === c.id ? 'selected' : '')}
-            >${escHtml(c.icon)} ${escHtml(c.name)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="field required">
-          <label for="ef-cc">Centro de Custo</label>
-          <select id="ef-cc">
-            <option value="">Selecione...</option>
-            ${ccs.map(cc => `<option value="${cc.id}" ${String(expense?.cost_center_id) === String(cc.id) ? 'selected' : ''}>${cc.code ? escHtml(cc.code) + ' | ' : ''}${escHtml(cc.name)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="field required">
-          <label for="ef-date">Data da Despesa</label>
-          <input type="date" id="ef-date" value="${expense?.expense_date || new Date().toISOString().slice(0,10)}" />
-        </div>
 
 
-        <!-- Campos padrão (ocultos quando Quilometragem) -->
-        <div class="field required" id="ef-amount-wrap">
-          <label for="ef-amount">Valor (R$)</label>
-          <input type="text" id="ef-amount" placeholder="R$ 0,00" value="${expense?.amount ? expense.amount.toFixed(2).replace('.', ',') : ''}" />
+        <div id="nf-warning" class="nf-warning hidden">
+          ⚠️ Esta categoria requer Nota Fiscal. Lembre-se de anexar o comprovante.
         </div>
-        <div class="field span-2 required" id="ef-desc-wrap">
-          <label for="ef-description">Descrição</label>
-          <textarea id="ef-description" rows="3" placeholder="Descreva a despesa..." maxlength="500" style="width:100%;min-height:75px;resize:vertical;">${escHtml(expense?.description || '')}</textarea>
+        <div id="limit-warning" class="nf-warning hidden" style="background:var(--blue-bg);border-color:#BFDBFE;color:var(--blue-text);">
+          ℹ️ <span id="limit-warning-text"></span>
         </div>
+        <div id="ef-error" class="login-error hidden" style="margin-top:12px;"></div>
       </div>
-
-
-      <!-- Bloco Quilometragem (oculto por padrão) -->
-      <div id="km-block" style="display:none;margin-top:12px;">
-        <div class="form-grid">
-          <div class="field required span-2">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
-              <label for="km-origin" style="margin:0;">📍 Ponto Inicial</label>
-              <button class="btn btn-ghost btn-sm" type="button" id="btn-locate-origin" style="padding: 2px 6px; font-size: 12px; font-weight: 600; color: var(--ml-indigo); display: flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 4px; background: white; cursor: pointer; transition: 0.2s;">
-                📍 Localizar minha posição
-              </button>
-            </div>
-            <div style="position:relative; width:100%;">
-              <input type="text" id="km-origin"
-                style="width:100%;"
-                placeholder="Ex: Avenida Vital Brasil, São Paulo, SP"
-                autocomplete="off"
-                value="${escHtml(originVal)}" />
-              <div id="km-origin-suggestions" class="autocomplete-dropdown hidden"></div>
-            </div>
-          </div>
-          <div class="field required span-2">
-            <label for="km-dest">🏁 Ponto Final</label>
-            <div style="position:relative; width:100%;">
-              <input type="text" id="km-dest"
-                style="width:100%;"
-                placeholder="Ex: Rua Emílio Trevisani, 50, Bauru, SP"
-                autocomplete="off"
-                value="${escHtml(destVal)}" />
-              <div id="km-dest-suggestions" class="autocomplete-dropdown hidden"></div>
-            </div>
-          </div>
-          <div class="field required span-2" style="margin-top:8px;">
-            <label for="km-notes">📝 Observação da Despesa *</label>
-            <textarea id="km-notes" rows="2" placeholder="Informe a observação / motivo do deslocamento..." style="width:100%;" required>${escHtml(kmNotesVal)}</textarea>
-          </div>
-          <div class="field span-2" style="display:flex;align-items:center;gap:10px;margin-top:10px;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e2e8f0;">
-            <input type="checkbox" id="km-roundtrip" style="width:18px!important;height:18px!important;min-width:18px;min-height:18px;margin:0!important;cursor:pointer;flex-shrink:0;" ${roundTripVal ? 'checked' : ''} />
-            <label for="km-roundtrip" style="font-weight:600;margin:0;cursor:pointer;font-size:13.5px;color:var(--text-1);line-height:1.3;">🔄 Trajeto de ida e volta (dobrar valor)</label>
-          </div>
-        </div>
-
-
-        <button class="btn btn-secondary" type="button"
-          id="km-calc-btn"
-          style="margin-top:12px;width:100%;justify-content:center;gap:8px;">
-          🗺️ Calcular Rota via OpenStreetMap
-        </button>
-
-
-        <p id="km-error" style="color:var(--red);font-size:13px;margin-top:6px;"></p>
-
-
-        <!-- Leaflet map -->
-        <div id="km-map"
-          style="height:240px;margin-top:14px;border-radius:10px;overflow:hidden;
-                 border:1.5px solid var(--border);display:none;">
-        </div>
-
-
-        <!-- Resultados calculados -->
-        <div id="km-results" style="display:none;margin-top:14px;">
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-            <div class="detail-section" style="text-align:center;padding:14px;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Distância</div>
-              <div style="font-size:20px;font-weight:800;color:var(--text-1);" id="km-dist">—</div>
-            </div>
-            <div class="detail-section" style="text-align:center;padding:14px;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Valor/km</div>
-              <div style="font-size:20px;font-weight:800;color:var(--text-1);" id="km-rate">—</div>
-            </div>
-            <div class="detail-section" style="text-align:center;padding:14px;background:var(--ml-light);">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ml-indigo);margin-bottom:4px;">Total</div>
-              <div style="font-size:20px;font-weight:800;color:var(--ml-indigo);" id="km-total">—</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-
-      <div id="nf-warning" class="nf-warning hidden">
-        ⚠️ Esta categoria requer Nota Fiscal. Lembre-se de anexar o comprovante.
-      </div>
-      <div id="limit-warning" class="nf-warning hidden" style="background:var(--blue-bg);border-color:#BFDBFE;color:var(--blue-text);">
-        ℹ️ <span id="limit-warning-text"></span>
-      </div>
-      <div id="ef-error" class="login-error hidden" style="margin-top:12px;"></div>
     `;
 
 
     const footer = `
       <button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
-      <button class="btn btn-primary" id="save-submit-btn">${id ? '💾 Salvar e Enviar' : '📤 Salvar e Enviar'}</button>
+      <button class="btn btn-primary" id="save-submit-btn" style="display:${isNewReceiptExpense ? 'none' : 'inline-flex'};">${id ? '💾 Salvar e Enviar' : '📤 Salvar e Enviar'}</button>
     `;
 
 
@@ -1838,20 +1872,43 @@ const ExpensesPage = {
     // Receipt Attachment Controls (Photo / File / OCR with auto-compression)
     this._selectedReceiptFile = null;
 
-    const stopCamera = () => {
+    const stopCameraAndLoop = () => {
+      if (window._autoCaptureInterval) {
+        clearInterval(window._autoCaptureInterval);
+        window._autoCaptureInterval = null;
+      }
       if (window._activeCameraStream) {
         try {
           window._activeCameraStream.getTracks().forEach(t => t.stop());
         } catch (e) {}
         window._activeCameraStream = null;
       }
-      const camBox = document.getElementById('camera-modal-container');
-      if (camBox) camBox.style.display = 'none';
+      window._stopAutoCaptureLoop = null;
+    };
+    window._stopAutoCaptureLoop = stopCameraAndLoop;
+
+    const goToStep2 = () => {
+      const step1 = document.getElementById('camera-step-wrap');
+      const step2 = document.getElementById('expense-fields-step');
+      const saveBtn = document.getElementById('save-submit-btn');
+      if (step1) step1.style.display = 'none';
+      if (step2) step2.style.display = 'block';
+      if (saveBtn) saveBtn.style.display = 'inline-flex';
+    };
+
+    const goToStep1 = () => {
+      const step1 = document.getElementById('camera-step-wrap');
+      const step2 = document.getElementById('expense-fields-step');
+      const saveBtn = document.getElementById('save-submit-btn');
+      if (step2) step2.style.display = 'none';
+      if (step1) step1.style.display = 'block';
+      if (saveBtn) saveBtn.style.display = 'none';
+      startCameraWithAutoCapture();
     };
 
     const processReceipt = async (file) => {
       if (!file) return;
-      stopCamera();
+      stopCameraAndLoop();
 
       const loader = document.getElementById('ocr-loading');
       if (loader) loader.style.display = 'block';
@@ -1866,6 +1923,9 @@ const ExpensesPage = {
         const pName = document.getElementById('receipt-filename');
         const pSize = document.getElementById('receipt-filesize');
         const pBadge = document.getElementById('receipt-status-badge');
+        const uploadBtns = document.getElementById('receipt-upload-buttons');
+
+        if (uploadBtns) uploadBtns.style.display = 'none';
 
         if (pBox && pName && pSize) {
           pName.textContent = compressed.name;
@@ -2008,71 +2068,243 @@ const ExpensesPage = {
       }
     };
 
-    // Botão Tirar Foto: prioriza câmera interna (evita que o Android mate o app em segundo plano)
-    const takePhotoBtn = document.getElementById('btn-take-photo');
-    if (takePhotoBtn) {
-      takePhotoBtn.addEventListener('click', async () => {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-            });
-            window._activeCameraStream = stream;
-            const video = document.getElementById('camera-video-preview');
-            const camBox = document.getElementById('camera-modal-container');
-            if (video && camBox) {
-              video.srcObject = stream;
-              camBox.style.display = 'block';
-              return;
-            }
-          } catch (e) {
-            console.warn('In-app camera not available, falling back to camera input:', e);
+    const startCameraWithAutoCapture = async () => {
+      stopCameraAndLoop();
+      window._stopAutoCaptureLoop = stopCameraAndLoop;
+
+      const video = document.getElementById('camera-video-preview');
+      const guideBox = document.getElementById('camera-guide-box');
+      const statusPill = document.getElementById('camera-status-pill');
+      const flashOverlay = document.getElementById('camera-flash-overlay');
+
+      if (!video) return;
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (statusPill) statusPill.textContent = 'Câmera não suportada neste dispositivo';
+        setTimeout(() => { stopCameraAndLoop(); goToStep2(); }, 1200);
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 2560 }
           }
+        });
+
+        window._activeCameraStream = stream;
+        video.srcObject = stream;
+        try {
+          await video.play();
+        } catch (playErr) {
+          console.warn('Erro no video.play():', playErr);
         }
-        document.getElementById('ef-receipt-camera')?.click();
-      });
-    }
 
-    // Botão Capturar da câmera interna
-    const captureCamBtn = document.getElementById('btn-capture-camera');
-    if (captureCamBtn) {
-      captureCamBtn.addEventListener('click', () => {
-        const video = document.getElementById('camera-video-preview');
-        if (!video) return;
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 1280;
-        canvas.height = video.videoHeight || 720;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        stopCamera();
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const file = new File([blob], `foto_recibo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-            processReceipt(file);
+        let steadyCounterMs = 0;
+        const intervalMs = 250;
+        let prevGrayscale = null;
+        let isCapturing = false;
+
+        const setGuideState = (state, text) => {
+          if (guideBox) {
+            guideBox.className = 'camera-guide-box ' + (
+              state === 1 ? 'state-searching' :
+              state === 2 ? 'state-detected' : 'state-capturing'
+            );
           }
-        }, 'image/jpeg', 0.85);
-      });
-    }
+          if (statusPill) {
+            statusPill.className = 'camera-status-pill ' + (
+              state === 1 ? '' :
+              state === 2 ? 'pill-detected' : 'pill-capturing'
+            );
+            statusPill.textContent = text;
+          }
+        };
 
-    const cancelCamBtn = document.getElementById('btn-cancel-camera');
-    if (cancelCamBtn) {
-      cancelCamBtn.addEventListener('click', stopCamera);
-    }
+        setGuideState(1, '🎯 Aponte para o cupom dentro da moldura');
 
-    // Botão Escolher Arquivo / Galeria
-    const pickFileBtn = document.getElementById('btn-pick-file');
-    if (pickFileBtn) {
-      pickFileBtn.addEventListener('click', () => {
+        const triggerCapture = () => {
+          if (isCapturing) return;
+          isCapturing = true;
+          setGuideState(3, '📸 Capturando...');
+
+          if (flashOverlay) {
+            flashOverlay.classList.add('flash-active');
+            setTimeout(() => flashOverlay?.classList.remove('flash-active'), 250);
+          }
+
+          const capCanvas = document.createElement('canvas');
+          capCanvas.width = video.videoWidth || 1920;
+          capCanvas.height = video.videoHeight || 2560;
+          const capCtx = capCanvas.getContext('2d');
+          capCtx.drawImage(video, 0, 0, capCanvas.width, capCanvas.height);
+
+          stopCameraAndLoop();
+
+          capCanvas.toBlob((blob) => {
+            if (blob) {
+              const file = new File([blob], `comprovante_${Date.now()}.jpg`, { type: 'image/jpeg' });
+              goToStep2();
+              processReceipt(file);
+            } else {
+              goToStep2();
+            }
+          }, 'image/jpeg', 0.88);
+        };
+
+        const manualCaptureBtn = document.getElementById('btn-manual-capture');
+        if (manualCaptureBtn) {
+          manualCaptureBtn.onclick = () => {
+            if (!isCapturing && video.videoWidth > 0) {
+              triggerCapture();
+            }
+          };
+        }
+
+        const auxCanvas = document.createElement('canvas');
+        auxCanvas.width = 160;
+        auxCanvas.height = 240;
+        const auxCtx = auxCanvas.getContext('2d', { willReadFrequently: true });
+
+        window._autoCaptureInterval = setInterval(() => {
+          if (isCapturing || !video || video.readyState < 2 || video.videoWidth === 0) return;
+
+          auxCtx.drawImage(video, 0, 0, auxCanvas.width, auxCanvas.height);
+          const roiX = 24;
+          const roiY = 36;
+          const roiW = 112;
+          const roiH = 168;
+
+          const imgData = auxCtx.getImageData(roiX, roiY, roiW, roiH);
+          const data = imgData.data;
+          const pixelCount = roiW * roiH;
+          const currentGray = new Uint8Array(pixelCount);
+
+          let sumLum = 0;
+          let minLum = 255;
+          let maxLum = 0;
+
+          for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+            const lum = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
+            currentGray[p] = lum;
+            sumLum += lum;
+            if (lum < minLum) minLum = lum;
+            if (lum > maxLum) maxLum = lum;
+          }
+
+          const meanLum = sumLum / pixelCount;
+          const contrast = maxLum - minLum;
+
+          let sumGrad = 0;
+          let gradSamples = 0;
+          for (let y = 1; y < roiH - 1; y += 2) {
+            const rowOffset = y * roiW;
+            for (let x = 1; x < roiW - 1; x += 2) {
+              const idx = rowOffset + x;
+              const gx = Math.abs(currentGray[idx + 1] - currentGray[idx - 1]);
+              const gy = Math.abs(currentGray[idx + roiW] - currentGray[idx - roiW]);
+              sumGrad += (gx + gy);
+              gradSamples++;
+            }
+          }
+          const sharpness = gradSamples > 0 ? (sumGrad / gradSamples) : 0;
+
+          let motionDiff = 0;
+          if (prevGrayscale && prevGrayscale.length === pixelCount) {
+            let diffSum = 0;
+            for (let p = 0; p < pixelCount; p += 4) {
+              diffSum += Math.abs(currentGray[p] - prevGrayscale[p]);
+            }
+            motionDiff = diffSum / (pixelCount / 4);
+          }
+          prevGrayscale = currentGray;
+
+          const hasDocument = contrast >= 45 && meanLum >= 40 && meanLum <= 240;
+          const isSharp = sharpness >= 8.5;
+          const isStill = prevGrayscale && motionDiff <= 6.5;
+
+          if (hasDocument && isSharp) {
+            if (isStill) {
+              steadyCounterMs += intervalMs;
+              setGuideState(2, '⏳ Cupom detectado, mantenha o celular parado...');
+              if (steadyCounterMs >= 1200) {
+                triggerCapture();
+              }
+            } else {
+              steadyCounterMs = 0;
+              setGuideState(2, '⏳ Mantenha o celular firme...');
+            }
+          } else {
+            steadyCounterMs = 0;
+            setGuideState(1, '🎯 Aponte para o cupom dentro da moldura');
+          }
+        }, intervalMs);
+
+      } catch (err) {
+        console.warn('Erro ao acessar câmera:', err);
+        if (statusPill) statusPill.textContent = '⚠️ Câmera indisponível. Carregue o arquivo ou preencha manualmente.';
+        setTimeout(() => {
+          stopCameraAndLoop();
+          goToStep2();
+        }, 1200);
+      }
+    };
+
+    // Botão Escolher Arquivo / Galeria (no visor da câmera)
+    const cameraGalleryBtn = document.getElementById('btn-camera-gallery');
+    if (cameraGalleryBtn) {
+      cameraGalleryBtn.addEventListener('click', () => {
+        stopCameraAndLoop();
         document.getElementById('ef-receipt-gallery')?.click();
       });
     }
 
-    const camInput = document.getElementById('ef-receipt-camera');
-    if (camInput) {
-      camInput.addEventListener('change', (e) => {
-        if (e.target.files && e.target.files[0]) {
-          processReceipt(e.target.files[0]);
-        }
+    // Link "Preencher manualmente sem foto"
+    const skipPhotoBtn = document.getElementById('btn-skip-photo');
+    if (skipPhotoBtn) {
+      skipPhotoBtn.addEventListener('click', () => {
+        stopCameraAndLoop();
+        goToStep2();
+      });
+    }
+
+    // Botão "Abrir Câmera" na Etapa 2
+    const step2RetakeBtn = document.getElementById('btn-step2-retake');
+    if (step2RetakeBtn) {
+      step2RetakeBtn.addEventListener('click', () => {
+        goToStep1();
+      });
+    }
+
+    // Botão "Refazer Foto" na caixa do comprovante
+    const retakePhotoBtn = document.getElementById('btn-retake-photo');
+    if (retakePhotoBtn) {
+      retakePhotoBtn.addEventListener('click', () => {
+        this._selectedReceiptFile = null;
+        this._currentAuditData = null;
+        const pBox = document.getElementById('receipt-preview-box');
+        const pBadge = document.getElementById('receipt-status-badge');
+        const alertBanner = document.getElementById('audit-alerts-banner');
+        const uploadBtns = document.getElementById('receipt-upload-buttons');
+        if (pBox) pBox.style.display = 'none';
+        if (pBadge) pBadge.style.display = 'none';
+        if (alertBanner) alertBanner.style.display = 'none';
+        if (uploadBtns) uploadBtns.style.display = 'flex';
+        const galleryInput = document.getElementById('ef-receipt-gallery');
+        if (galleryInput) galleryInput.value = '';
+        goToStep1();
+      });
+    }
+
+    // Botão "Escolher Arquivo / Galeria" na Etapa 2
+    const pickFileBtn = document.getElementById('btn-pick-file');
+    if (pickFileBtn) {
+      pickFileBtn.addEventListener('click', () => {
+        stopCameraAndLoop();
+        document.getElementById('ef-receipt-gallery')?.click();
       });
     }
 
@@ -2080,6 +2312,7 @@ const ExpensesPage = {
     if (galleryInput) {
       galleryInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
+          goToStep2();
           processReceipt(e.target.files[0]);
         }
       });
@@ -2094,12 +2327,18 @@ const ExpensesPage = {
         const pBox = document.getElementById('receipt-preview-box');
         const pBadge = document.getElementById('receipt-status-badge');
         const alertBanner = document.getElementById('audit-alerts-banner');
+        const uploadBtns = document.getElementById('receipt-upload-buttons');
         if (pBox) pBox.style.display = 'none';
         if (pBadge) pBadge.style.display = 'none';
         if (alertBanner) alertBanner.style.display = 'none';
-        if (camInput) camInput.value = '';
+        if (uploadBtns) uploadBtns.style.display = 'flex';
         if (galleryInput) galleryInput.value = '';
       });
+    }
+
+    // Se nova despesa normal, inicia a câmera com auto-capture imediatamente
+    if (isNewReceiptExpense) {
+      startCameraWithAutoCapture();
     }
   },
 

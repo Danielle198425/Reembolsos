@@ -155,6 +155,10 @@ const Modal = {
     document.getElementById('modal-overlay').classList.remove('hidden');
   },
   close() {
+    if (window._stopAutoCaptureLoop) {
+      try { window._stopAutoCaptureLoop(); } catch (e) {}
+      window._stopAutoCaptureLoop = null;
+    }
     if (window._activeCameraStream) {
       try {
         window._activeCameraStream.getTracks().forEach(t => t.stop());
