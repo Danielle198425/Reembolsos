@@ -392,6 +392,9 @@ class SavedAddressesResponse(BaseModel):
     favorites: List[SavedAddressOut]
     recent: List[SavedAddressOut]
 
+    class Config:
+        from_attributes = True
+
 
 class SaveFavoriteRequest(BaseModel):
     address: str

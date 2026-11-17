@@ -71,6 +71,44 @@ _MIGRATIONS = [
 
 
 def run_auto_migrations():
+    # Garante a criação de todas as tabelas mapeadas no SQLAlchemy (ex: user_saved_addresses)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"[migration] Base.metadata.create_all: {e}")
+
+    # Criação explícita da tabela user_saved_addresses se necessário
+    try:
+        with engine.begin() as conn:
+            if IS_SQLITE:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS user_saved_addresses (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        address TEXT NOT NULL,
+                        label VARCHAR(100),
+                        is_favorite BOOLEAN NOT NULL DEFAULT 0,
+                        last_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                """))
+            else:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS user_saved_addresses (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        address TEXT NOT NULL,
+                        label VARCHAR(100),
+                        is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
+                        last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_user_saved_addresses_user_id ON user_saved_addresses(user_id);
+                    CREATE INDEX IF NOT EXISTS ix_user_saved_addresses_id ON user_saved_addresses(id);
+                """))
+    except Exception as e:
+        print(f"[migration] user_saved_addresses table init: {e}")
+
     insp = inspect(engine)
     existing_tables = set(insp.get_table_names())
     cache = {}
