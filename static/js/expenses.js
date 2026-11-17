@@ -1666,7 +1666,7 @@ const ExpensesPage = {
           <button class="btn btn-secondary" type="button"
             id="km-calc-btn"
             style="margin-top:12px;width:100%;justify-content:center;gap:8px;">
-            🗺️ Calcular Rota
+            🗺️ Calcular Rota (Azure Maps)
           </button>
 
 
@@ -2996,8 +2996,8 @@ const ExpensesPage = {
       this._kmMap = lmap;
 
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
+      L.tileLayer('/api/maps/tile/{z}/{x}/{y}', {
+        attribution: '© Microsoft Azure Maps',
         maxZoom: 18,
       }).addTo(lmap);
 
@@ -3033,7 +3033,7 @@ const ExpensesPage = {
       errEl.textContent = 'Erro ao calcular rota: ' + err.message;
     } finally {
       calcBtn.disabled    = false;
-      calcBtn.textContent = '🗺️ Calcular Rota via OpenStreetMap';
+      calcBtn.textContent = '🗺️ Calcular Rota (Azure Maps)';
     }
   },
 

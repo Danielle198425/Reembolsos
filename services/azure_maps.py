@@ -486,3 +486,41 @@ def calculate_route(
         if res:
             return res
         raise RuntimeError(f"Erro ao calcular rota: {str(e)}")
+
+
+def get_map_tile(z: int, x: int, y: int) -> Tuple[bytes, str]:
+    """
+    Obtém a imagem de tile do mapa via Azure Maps Render Tile API.
+    Utiliza autenticação gerenciada via Entra ID (DefaultAzureCredential) + x-ms-client-id.
+    Se não configurado ou em caso de indisponibilidade, recorre aos tiles do OpenStreetMap.
+    """
+    if is_azure_maps_configured():
+        headers = get_azure_maps_headers()
+        if headers:
+            url = "https://atlas.microsoft.com/map/tile"
+            params = {
+                "api-version": "2024-04-01",
+                "tilesetId": "microsoft.base.road",
+                "zoom": z,
+                "x": x,
+                "y": y,
+                "language": "pt-BR"
+            }
+            try:
+                resp = requests.get(url, params=params, headers=headers, timeout=5)
+                if resp.status_code == 200 and resp.content:
+                    c_type = resp.headers.get("Content-Type", "image/png")
+                    return resp.content, c_type
+                else:
+                    logger.warning(f"[azure_maps] Status {resp.status_code} no Render Tile API. Usando fallback.")
+            except Exception as e:
+                logger.warning(f"[azure_maps] Erro ao carregar tile do Azure Maps: {e}. Usando fallback.")
+
+    # Fallback para OpenStreetMap
+    osm_url = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    resp = requests.get(
+        osm_url,
+        headers={"User-Agent": DEFAULT_USER_AGENT},
+        timeout=6
+    )
+    return resp.content, resp.headers.get("Content-Type", "image/png")
