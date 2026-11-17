@@ -206,6 +206,12 @@ class ExpenseBase(BaseModel):
     amount: float
     expense_date: date
     notes: Optional[str] = None
+    receipt_cnpj: Optional[str] = None
+    receipt_access_key: Optional[str] = None
+    receipt_time: Optional[str] = None
+    has_alcohol: Optional[bool] = False
+    is_duplicate: Optional[bool] = False
+    audit_alerts: Optional[str] = None
 
 
 class ExpenseCreate(ExpenseBase):
@@ -220,6 +226,12 @@ class ExpenseUpdate(BaseModel):
     amount: Optional[float] = None
     expense_date: Optional[date] = None
     notes: Optional[str] = None
+    receipt_cnpj: Optional[str] = None
+    receipt_access_key: Optional[str] = None
+    receipt_time: Optional[str] = None
+    has_alcohol: Optional[bool] = None
+    is_duplicate: Optional[bool] = None
+    audit_alerts: Optional[str] = None
 
 
 class ExpenseOut(ExpenseBase):

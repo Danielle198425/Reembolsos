@@ -865,6 +865,20 @@ const ExpensesPage = {
       ? `<span class="receipt-icon" title="Ver comprovante" style="cursor:pointer;" onclick="ExpensesPage.viewReceipt('${escHtml((e.receipt_path || '').replace(/\\/g, '/'))}')">📎</span>`
       : (e.category_requires_nf ? '<span title="NF obrigatória!" style="color:var(--amber);">⚠️</span>' : '');
 
+    let auditTooltip = '';
+    if (e.has_alcohol && e.is_duplicate) {
+      auditTooltip = 'Auditoria: Bebida alcoólica e cupom duplicado detectados';
+    } else if (e.has_alcohol) {
+      auditTooltip = 'Auditoria: Item suspeito de bebida alcoólica detectado';
+    } else if (e.is_duplicate) {
+      auditTooltip = 'Auditoria: Cupom suspeito de duplicidade detectado';
+    } else if (e.audit_alerts && e.audit_alerts.length > 0) {
+      auditTooltip = `Auditoria: ${e.audit_alerts[0]}`;
+    }
+    const auditBadge = auditTooltip
+      ? `<span title="${escHtml(auditTooltip)}" style="color:#ef4444;font-size:16px;line-height:1;cursor:help;display:inline-block;" data-tooltip="${escHtml(auditTooltip)}">🚨</span>`
+      : '';
+
     const alertTooltip = e.is_corrected
       ? 'Despesa corrigida'
       : (e.edited_after_approval ? 'Parcela editada após autorização' : '');
@@ -920,8 +934,9 @@ const ExpensesPage = {
     return `
       <tr data-id="${e.id}" class="expense-row">
         ${isAdminOrFinance ? `<td class="col-check hide-on-mobile" style="width:36px;text-align:center;"><input type="checkbox" class="exp-checkbox" value="${e.id}" data-status="${e.status}" title="${checkboxTitle}" ${checkboxDisabled} ${isChecked ? 'checked' : ''} /></td>` : ''}
-        <td class="col-alerts" style="width:28px;padding:0 2px;text-align:center;">
+        <td class="col-alerts" style="width:36px;padding:0 2px;text-align:center;">
           <div style="display:inline-flex;align-items:center;justify-content:center;gap:2px;">
+            ${auditBadge}
             ${alertBadge}
             ${impAlertBadge}
           </div>
@@ -1211,6 +1226,26 @@ const ExpensesPage = {
             </div>
           </div>` : ''}
 
+          ${(e.has_alcohol || e.is_duplicate || (e.audit_alerts && e.audit_alerts.length > 0)) ? `
+          <div class="detail-section" style="border-left:4px solid #ef4444;background:rgba(239,68,68,0.06);padding:14px 16px;border-radius:8px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+              <div style="font-weight:700;color:#b91c1c;font-size:14px;display:flex;align-items:center;gap:6px;">
+                <span style="font-size:18px;">⚠️</span> Auditoria do Comprovante (Azure AI)
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                ${e.has_alcohol ? '<span style="background:#fee2e2;color:#b91c1c;font-weight:700;font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid #fca5a5;">Bebida Alcoólica</span>' : ''}
+                ${e.is_duplicate ? '<span style="background:#fef3c7;color:#b45309;font-weight:700;font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid #fcd34d;">Cupom Duplicado</span>' : ''}
+              </div>
+            </div>
+            ${(e.audit_alerts && e.audit_alerts.length > 0) ? `
+              <ul style="margin:0;padding-left:18px;font-size:13px;color:#991b1b;line-height:1.5;">
+                ${e.audit_alerts.map(a => `<li>${escHtml(a)}</li>`).join('')}
+              </ul>
+            ` : ''}
+            ${e.receipt_access_key ? `<div style="font-size:12px;color:var(--text-3);margin-top:6px;font-family:monospace;">Chave NFC-e: ${escHtml(e.receipt_access_key)}</div>` : ''}
+            ${e.receipt_cnpj ? `<div style="font-size:12px;color:var(--text-3);font-family:monospace;">CNPJ do Estabelecimento: ${escHtml(e.receipt_cnpj)}</div>` : ''}
+          </div>` : ''}
+
           <div class="detail-section">
             <h4>Dados da Despesa</h4>
             <div class="detail-row"><span class="detail-key">Descrição</span><span class="detail-value">${escHtml(e.description)}</span></div>
@@ -1399,6 +1434,14 @@ const ExpensesPage = {
     });
     this._kmMap = null;   // reset leaflet map reference
     this._kmData = null;  // reset km calculation result
+    this._currentAuditData = expense ? {
+      alertas: expense.audit_alerts || [],
+      has_alcohol: Boolean(expense.has_alcohol),
+      is_duplicate: Boolean(expense.is_duplicate),
+      cnpj: expense.receipt_cnpj || '',
+      chaveAcesso: expense.receipt_access_key || '',
+      hora: expense.receipt_time || ''
+    } : null;
 
 
     let originVal = "";
@@ -1488,6 +1531,18 @@ const ExpensesPage = {
           <div id="ocr-loading" style="display:none;font-size:12px;color:var(--ml-indigo);margin-top:6px;">
             <span class="spinner" style="width:12px;height:12px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:4px;"></span>
             Lendo comprovante com IA...
+          </div>
+
+          <div id="audit-alerts-banner" style="display:${(expense?.audit_alerts && expense.audit_alerts.length > 0) ? 'block' : 'none'};margin-top:12px;padding:12px 14px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13px;">
+            <div style="font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <span style="font-size:16px;">⚠️</span> Alertas de Auditoria do Comprovante
+            </div>
+            <ul id="audit-alerts-list" style="margin:0;padding-left:20px;line-height:1.5;">
+              ${(expense?.audit_alerts && expense.audit_alerts.length > 0) ? expense.audit_alerts.map(a => `<li>${escHtml(a)}</li>`).join('') : ''}
+            </ul>
+            <div style="font-size:11.5px;color:#7f1d1d;margin-top:6px;">
+              Você ainda pode submeter a despesa caso se trate de uma justificativa autorizada ou falso positivo, mas as informações de auditoria ficarão registradas para análise do aprovador e do financeiro.
+            </div>
           </div>
         </div>
         <div class="field span-2 required" id="ef-provider-wrap">
@@ -1881,6 +1936,28 @@ const ExpensesPage = {
         }
 
         if (data) {
+          // Atualiza dados de auditoria
+          this._currentAuditData = {
+            alertas: data.alertas || [],
+            has_alcohol: Boolean(data.has_alcohol),
+            is_duplicate: Boolean(data.is_duplicate),
+            cnpj: data.cnpj || '',
+            chaveAcesso: data.chaveAcesso || '',
+            hora: data.hora || ''
+          };
+
+          const alertBanner = document.getElementById('audit-alerts-banner');
+          const alertList = document.getElementById('audit-alerts-list');
+          if (alertBanner && alertList) {
+            if (data.alertas && data.alertas.length > 0) {
+              alertList.innerHTML = data.alertas.map(a => `<li>${escHtml(a)}</li>`).join('');
+              alertBanner.style.display = 'block';
+            } else {
+              alertBanner.style.display = 'none';
+              alertList.innerHTML = '';
+            }
+          }
+
           const providerVal = data.estabelecimento || data.provider;
           if (providerVal && providerVal !== 'Estabelecimento Comercial') {
             document.getElementById('ef-provider').value = providerVal;
@@ -1907,16 +1984,20 @@ const ExpensesPage = {
           this._checkAmountLimit();
 
           if (typeof toast === 'function') {
-            let missingFields = [];
-            if (!providerVal || providerVal === 'Estabelecimento Comercial') missingFields.push("estabelecimento");
-            if (!dateVal) missingFields.push("data");
-            if (!amountVal || amountVal <= 0) missingFields.push("valor total");
-
-            if (missingFields.length > 0) {
-              let missingStr = missingFields.join(", ");
-              toast(`Comprovante lido: campo(s) ${missingStr} não identificado(s) automaticamente, favor verificar e preencher.`, 'warning');
+            if (data.alertas && data.alertas.length > 0) {
+              toast('Atenção: Alertas de auditoria identificados no comprovante (verifique o aviso)', 'warning');
             } else {
-              toast('Comprovante lido com sucesso pelo Azure Document Intelligence!', 'success');
+              let missingFields = [];
+              if (!providerVal || providerVal === 'Estabelecimento Comercial') missingFields.push("estabelecimento");
+              if (!dateVal) missingFields.push("data");
+              if (!amountVal || amountVal <= 0) missingFields.push("valor total");
+
+              if (missingFields.length > 0) {
+                let missingStr = missingFields.join(", ");
+                toast(`Comprovante lido: campo(s) ${missingStr} não identificado(s) automaticamente, favor verificar e preencher.`, 'warning');
+              } else {
+                toast('Comprovante lido com sucesso pelo Azure Document Intelligence!', 'success');
+              }
             }
           }
         }
@@ -2009,10 +2090,13 @@ const ExpensesPage = {
     if (removeReceiptBtn) {
       removeReceiptBtn.addEventListener('click', () => {
         this._selectedReceiptFile = null;
+        this._currentAuditData = null;
         const pBox = document.getElementById('receipt-preview-box');
         const pBadge = document.getElementById('receipt-status-badge');
+        const alertBanner = document.getElementById('audit-alerts-banner');
         if (pBox) pBox.style.display = 'none';
         if (pBadge) pBadge.style.display = 'none';
+        if (alertBanner) alertBanner.style.display = 'none';
         if (camInput) camInput.value = '';
         if (galleryInput) galleryInput.value = '';
       });
@@ -2615,7 +2699,26 @@ const ExpensesPage = {
     }
 
 
-    const body = { category_id: catId, cost_center_id: ccId, expense_date: date, amount, description, notes: notes || null, provider: provider || null };
+    const body = { 
+      category_id: catId, 
+      cost_center_id: ccId, 
+      expense_date: date, 
+      amount, 
+      description, 
+      notes: notes || null, 
+      provider: provider || null 
+    };
+
+    if (this._currentAuditData) {
+      if (this._currentAuditData.cnpj) body.receipt_cnpj = this._currentAuditData.cnpj;
+      if (this._currentAuditData.chaveAcesso) body.receipt_access_key = this._currentAuditData.chaveAcesso;
+      if (this._currentAuditData.hora) body.receipt_time = this._currentAuditData.hora;
+      body.has_alcohol = Boolean(this._currentAuditData.has_alcohol);
+      body.is_duplicate = Boolean(this._currentAuditData.is_duplicate);
+      if (this._currentAuditData.alertas && this._currentAuditData.alertas.length > 0) {
+        body.audit_alerts = JSON.stringify(this._currentAuditData.alertas);
+      }
+    }
 
 
     const saveBtn = document.getElementById('save-submit-btn');
@@ -2721,6 +2824,7 @@ const ExpensesPage = {
       errEl.classList.remove('hidden');
     } finally {
       this._selectedReceiptFile = null;
+      this._currentAuditData = null;
       saveBtn.disabled = false;
       saveBtn.textContent = id ? '💾 Salvar e Enviar' : '📤 Salvar e Enviar';
     }

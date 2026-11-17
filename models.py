@@ -152,6 +152,12 @@ class Expense(Base):
     finalized_by_admin_name = Column(String(200), nullable=True)
     paid_by_admin_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     paid_by_admin_name = Column(String(200), nullable=True)
+    receipt_cnpj = Column(String(20), nullable=True)
+    receipt_access_key = Column(String(50), nullable=True)
+    receipt_time = Column(String(20), nullable=True)
+    has_alcohol = Column(Boolean, default=False)
+    is_duplicate = Column(Boolean, default=False)
+    audit_alerts = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

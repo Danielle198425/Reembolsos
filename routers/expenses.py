@@ -9,7 +9,7 @@ from fastapi import (
     UploadFile, File, Query, Request
 )
 from fastapi.responses import FileResponse
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, func
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas, auth
@@ -192,6 +192,12 @@ def _expense_out(e: models.Expense) -> dict:
         "finalized_by_admin_name": getattr(e, 'finalized_by_admin_name', None),
         "paid_by_admin_id": getattr(e, 'paid_by_admin_id', None),
         "paid_by_admin_name": getattr(e, 'paid_by_admin_name', None),
+        "receipt_cnpj": getattr(e, 'receipt_cnpj', None),
+        "receipt_access_key": getattr(e, 'receipt_access_key', None),
+        "receipt_time": getattr(e, 'receipt_time', None),
+        "has_alcohol": bool(getattr(e, 'has_alcohol', False)),
+        "is_duplicate": bool(getattr(e, 'is_duplicate', False)),
+        "audit_alerts": json.loads(e.audit_alerts) if (getattr(e, 'audit_alerts', None) and str(e.audit_alerts).strip().startswith("[")) else ([e.audit_alerts] if getattr(e, 'audit_alerts', None) else []),
         "edit_history": json.loads(e.edit_history) if getattr(e, 'edit_history', None) else [],
     }
 
@@ -391,6 +397,39 @@ def create_expense(
             "changes": [f"Despesa criada pelo Administrador {imp_name} no modo 'Ver como' (simulando perfil de {current_user.name})"]
         }])
 
+    is_dup = bool(body.is_duplicate)
+    alerts_list = []
+    if body.audit_alerts:
+        try:
+            alerts_list = json.loads(body.audit_alerts) if str(body.audit_alerts).strip().startswith("[") else [body.audit_alerts]
+        except Exception:
+            alerts_list = [str(body.audit_alerts)]
+
+    if not is_dup and body.receipt_access_key and len(body.receipt_access_key.strip()) == 44:
+        dup = db.query(models.Expense).filter(
+            models.Expense.receipt_access_key == body.receipt_access_key.strip(),
+            models.Expense.status != models.ExpenseStatus.rejeitado
+        ).first()
+        if dup:
+            is_dup = True
+            d_fmt = dup.expense_date.strftime("%d/%m/%Y") if hasattr(dup.expense_date, "strftime") else str(dup.expense_date)
+            alerts_list.append(f"Cupom já cadastrado anteriormente no sistema (Despesa #{dup.id:06d} em {d_fmt} - R$ {dup.amount:.2f})")
+
+    if not is_dup and body.amount and body.expense_date:
+        if body.receipt_cnpj:
+            dup_c = db.query(models.Expense).filter(
+                models.Expense.receipt_cnpj == body.receipt_cnpj.strip(),
+                models.Expense.expense_date == body.expense_date,
+                func.abs(models.Expense.amount - body.amount) < 0.01,
+                models.Expense.status != models.ExpenseStatus.rejeitado
+            ).first()
+            if dup_c:
+                is_dup = True
+                d_fmt = dup_c.expense_date.strftime("%d/%m/%Y") if hasattr(dup_c.expense_date, "strftime") else str(dup_c.expense_date)
+                alerts_list.append(f"Cupom com mesmo CNPJ, data e valor já cadastrado anteriormente (Despesa #{dup_c.id:06d} em {d_fmt} - R$ {dup_c.amount:.2f})")
+
+    final_audit_alerts = json.dumps(alerts_list, ensure_ascii=False) if alerts_list else None
+
     expense = models.Expense(
         user_id=current_user.id,
         category_id=body.category_id,
@@ -404,6 +443,12 @@ def create_expense(
         created_by_admin_id=imp_id if admin_creator else None,
         created_by_admin_name=imp_name if imp_id else None,
         edit_history=initial_history,
+        receipt_cnpj=body.receipt_cnpj,
+        receipt_access_key=body.receipt_access_key,
+        receipt_time=body.receipt_time,
+        has_alcohol=bool(body.has_alcohol),
+        is_duplicate=is_dup,
+        audit_alerts=final_audit_alerts,
     )
     db.add(expense)
     db.commit()
@@ -875,15 +920,12 @@ def get_ocr_engine():
 @router.post("/scan-receipt")
 async def scan_receipt(
     file: UploadFile = File(...),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
-    Leitura inteligente de recibos, cupons fiscais e comprovantes de pedágio via Azure AI Document Intelligence
-    utilizando o modelo pré-treinado 'prebuilt-receipt' e autenticação sem chave estática (DefaultAzureCredential).
-    Retorna:
-      - estabelecimento (MerchantName com fallback para MerchantAddress)
-      - data (TransactionDate formatada em YYYY-MM-DD)
-      - valorTotal (Total numérico)
+    Leitura inteligente de recibos, cupons fiscais e comprovantes via Azure AI Document Intelligence
+    com auditoria automática de bebidas alcoólicas e verificação de cupons duplicados no banco de dados.
     """
     try:
         from services.azure_document_intelligence import analyze_receipt
@@ -892,6 +934,62 @@ async def scan_receipt(
             raise HTTPException(status_code=400, detail="Arquivo vazio enviado para leitura.")
 
         data = analyze_receipt(file_bytes)
+
+        # Auditoria de Duplicidade no banco de dados
+        is_duplicate = False
+        duplicate_reason = None
+
+        chave_acesso = data.get("chaveAcesso")
+        cnpj = data.get("cnpj")
+        data_str = data.get("data")
+        valor = data.get("valorTotal")
+        estabelecimento = data.get("estabelecimento")
+
+        # 1. Checa por Chave de Acesso de 44 dígitos da NFC-e/SAT
+        if chave_acesso and len(chave_acesso.strip()) == 44:
+            dup = db.query(models.Expense).filter(
+                models.Expense.receipt_access_key == chave_acesso.strip(),
+                models.Expense.status != models.ExpenseStatus.rejeitado
+            ).first()
+            if dup:
+                is_duplicate = True
+                d_fmt = dup.expense_date.strftime("%d/%m/%Y") if hasattr(dup.expense_date, "strftime") else str(dup.expense_date)
+                duplicate_reason = f"Cupom já cadastrado anteriormente no sistema (Despesa #{dup.id:06d} em {d_fmt} - R$ {dup.amount:.2f})"
+
+        # 2. Checa por (CNPJ ou Estabelecimento) + Data + Valor
+        if not is_duplicate and data_str and valor and valor > 0:
+            try:
+                parsed_d = datetime.strptime(data_str, "%Y-%m-%d").date()
+                q_dup = db.query(models.Expense).filter(
+                    models.Expense.expense_date == parsed_d,
+                    func.abs(models.Expense.amount - valor) < 0.01,
+                    models.Expense.status != models.ExpenseStatus.rejeitado
+                )
+                if cnpj:
+                    dup_c = q_dup.filter(models.Expense.receipt_cnpj == cnpj.strip()).first()
+                    if dup_c:
+                        is_duplicate = True
+                        d_fmt = dup_c.expense_date.strftime("%d/%m/%Y") if hasattr(dup_c.expense_date, "strftime") else str(dup_c.expense_date)
+                        duplicate_reason = f"Cupom com mesmo CNPJ, data e valor já cadastrado anteriormente (Despesa #{dup_c.id:06d} em {d_fmt} - R$ {dup_c.amount:.2f})"
+
+                if not is_duplicate and estabelecimento and len(estabelecimento.strip()) >= 3:
+                    dup_e = q_dup.filter(func.lower(models.Expense.provider) == estabelecimento.strip().lower()).first()
+                    if dup_e:
+                        is_duplicate = True
+                        d_fmt = dup_e.expense_date.strftime("%d/%m/%Y") if hasattr(dup_e.expense_date, "strftime") else str(dup_e.expense_date)
+                        duplicate_reason = f"Cupom com mesmo estabelecimento, data e valor já cadastrado anteriormente (Despesa #{dup_e.id:06d} em {d_fmt} - R$ {dup_e.amount:.2f})"
+            except Exception:
+                pass
+
+        if "alertas" not in data or not isinstance(data["alertas"], list):
+            data["alertas"] = []
+
+        if is_duplicate and duplicate_reason:
+            data["alertas"].append(duplicate_reason)
+            data["is_duplicate"] = True
+        else:
+            data["is_duplicate"] = False
+
         return data
     except HTTPException:
         raise

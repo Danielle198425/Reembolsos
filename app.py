@@ -44,6 +44,12 @@ _MIGRATIONS = [
     ("expenses", "finalized_by_admin_name", "VARCHAR(200)"),
     ("expenses", "paid_by_admin_id", "INTEGER REFERENCES users(id)"),
     ("expenses", "paid_by_admin_name", "VARCHAR(200)"),
+    ("expenses", "receipt_cnpj", "VARCHAR(20)"),
+    ("expenses", "receipt_access_key", "VARCHAR(50)"),
+    ("expenses", "receipt_time", "VARCHAR(20)"),
+    ("expenses", "has_alcohol", _BOOL_FALSE),
+    ("expenses", "is_duplicate", _BOOL_FALSE),
+    ("expenses", "audit_alerts", "TEXT"),
 
     ("exports", "target_user_id", "INTEGER REFERENCES users(id)"),
     ("exports", "expense_user_ids", "TEXT"),
