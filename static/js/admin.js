@@ -1783,7 +1783,7 @@ const AdminPage = {
 
     try {
       const [cats, plans] = await Promise.all([
-        Api.getCategories(),
+        Api.getCategories(true),
         Api.getSiengeFinancialPlans().catch(() => [])
       ]);
       
@@ -1841,7 +1841,7 @@ const AdminPage = {
 
     let cat = null;
     if (id) {
-      const cats = await Api.getCategories();
+      const cats = await Api.getCategories(true);
       cat = cats.find(c => c.id === id);
     }
 
@@ -1982,7 +1982,7 @@ const AdminPage = {
 
   async toggleCategoryStatus(id, active) {
     try {
-      const cats = await Api.getCategories();
+      const cats = await Api.getCategories(true);
       const cat = cats.find(c => c.id === id);
       if (cat) {
         await Api.updateCategory(id, { ...cat, active });
@@ -3527,7 +3527,7 @@ const AdminPage = {
     try {
       const [rules, allCcs, siengeCcs, allUsers] = await Promise.all([
         Api.getCostCenterRules().catch(() => []),
-        Api.getCostCenters().catch(() => []),
+        Api.getCostCenters(true).catch(() => []),
         Api.getSiengeCostCenters().catch(() => []),
         Api.getUsers().catch(() => [])
       ]);
@@ -4238,7 +4238,7 @@ const AdminPage = {
     try {
       const [rules, allCats, allUsers] = await Promise.all([
         Api.getCategoryRules().catch(() => []),
-        Api.getCategories().catch(() => []),
+        Api.getCategories(true).catch(() => []),
         Api.getUsers().catch(() => [])
       ]);
 
@@ -4615,8 +4615,8 @@ const AdminPage = {
       const [rules, allDepts, allCats, allCcs, siengeCcs, financialPlans] = await Promise.all([
         Api.getCategoryOverrideRules().catch(() => []),
         Api.getSiengeDepartments().catch(() => []),
-        Api.getCategories().catch(() => []),
-        Api.getCostCenters().catch(() => []),
+        Api.getCategories(true).catch(() => []),
+        Api.getCostCenters(true).catch(() => []),
         Api.getSiengeCostCenters().catch(() => []),
         Api.getSiengeFinancialPlans().catch(() => [])
       ]);

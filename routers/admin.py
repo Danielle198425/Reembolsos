@@ -518,15 +518,21 @@ def list_audit_logs(
 
 # ─── COST CENTERS ────────────────────────────────────────────────────────────
 @router.get("/cost-centers")
-def list_cost_centers(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
+def list_cost_centers(
+    all: bool = Query(False, description="Retornar todos os centros de custo sem filtrar por regras de usuário"),
+    db: Session = Depends(get_db), 
+    current_user=Depends(auth.get_current_user)
+):
     all_active_ccs = [
         cc for cc in db.query(models.CostCenter).filter(models.CostCenter.active == True).all()
         if str(cc.code or "").strip() != "70131" and not (str(cc.code or "").strip() == "70131" or (str(cc.name or "").strip().lower() == "vendas" and str(cc.code or "").strip() == "70131"))
     ]
 
-    if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
+    # Retorna todos apenas se solicitado explicitamente para gestão no painel de administração
+    if all and current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
         return all_active_ccs
 
+    # Para lançamento de despesas, aplica as regras para TODOS os usuários (incluindo admin e financeiro)
     rules = db.query(models.CostCenterRule).all()
     if not rules:
         return all_active_ccs
@@ -757,13 +763,18 @@ def toggle_company_status(
 
 # ─── CATEGORIES ──────────────────────────────────────────────────────────────
 @router.get("/categories")
-def list_categories(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
-    # Para administradores e financeiro (gestão de categorias no painel admin), retorna todas as categorias (ativas e inativas)
-    if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
+def list_categories(
+    all: bool = Query(False, description="Retornar todas as categorias sem filtrar por regras de usuário"),
+    db: Session = Depends(get_db), 
+    current_user=Depends(auth.get_current_user)
+):
+    # Retorna todas as categorias (ativas e inativas) apenas se solicitado explicitamente para gestão no painel de administração
+    if all and current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
         return db.query(models.Category).order_by(models.Category.name).all()
 
     all_active_cats = db.query(models.Category).filter(models.Category.active == True).all()
 
+    # Para lançamento de despesas, aplica as regras para TODOS os usuários (incluindo admin e financeiro)
     cat_rules = db.query(models.CategoryRule).all()
     app_rules = db.query(models.ApportionmentRule).all()
 

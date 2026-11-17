@@ -157,7 +157,7 @@ const Api = {
   impersonateUser(id) { return Api.post(`/api/admin/users/${id}/impersonate`); },
 
   // ── Admin — Cost Centers ──────────────────────────────────────────────────
-  getCostCenters() { return Api.get('/api/admin/cost-centers'); },
+  getCostCenters(all = false) { return Api.get('/api/admin/cost-centers' + (all ? '?all=true' : '')); },
   createCostCenter(data) { return Api.post('/api/admin/cost-centers', data); },
   updateCostCenter(id, data) { return Api.put(`/api/admin/cost-centers/${id}`, data); },
   deleteCostCenter(id) { return Api.delete(`/api/admin/cost-centers/${id}`); },
@@ -187,7 +187,7 @@ const Api = {
   deleteJobFunction(id) { return Api.delete(`/api/admin/job-functions/${id}`); },
 
   // ── Admin — Categories ───────────────────────────────────────────────────
-  getCategories() { return Api.get('/api/admin/categories'); },
+  getCategories(all = false) { return Api.get('/api/admin/categories' + (all ? '?all=true' : '')); },
   createCategory(data) { return Api.post('/api/admin/categories', data); },
   updateCategory(id, data) { return Api.put(`/api/admin/categories/${id}`, data); },
   deleteCategory(id) { return Api.delete(`/api/admin/categories/${id}`); },

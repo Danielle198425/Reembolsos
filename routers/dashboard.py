@@ -108,8 +108,8 @@ def get_summary(
         except ValueError:
             pass
 
-    def total_by_status(status_val):
-        result = base.filter(models.Expense.status == status_val).with_entities(
+    def total_by_status(*status_vals):
+        result = base.filter(models.Expense.status.in_(status_vals)).with_entities(
             func.coalesce(func.sum(models.Expense.amount), 0)
         ).scalar()
         return float(result or 0)
@@ -141,8 +141,8 @@ def get_summary(
     return {
         "total_a_enviar": 0.0,
         "total_aguardando_aprovacao": total_by_status(models.ExpenseStatus.aguardando_aprovacao),
-        "total_aguardando_finalizacao": total_by_status(models.ExpenseStatus.aguardando_finalizacao),
-        "total_pago": total_by_status(models.ExpenseStatus.pago),
+        "total_aguardando_finalizacao": total_by_status(models.ExpenseStatus.aguardando_finalizacao, models.ExpenseStatus.aprovado),
+        "total_pago": total_by_status(models.ExpenseStatus.pago, models.ExpenseStatus.enviado),
         "pending_tasks": pending_tasks,
         "expenses_by_category": expenses_by_category,
         "recent_expenses": [_expense_dict(e) for e in recent],

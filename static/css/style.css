@@ -1682,6 +1682,10 @@ tbody td {
   .show-on-mobile {
     display: block !important;
   }
+  button.show-on-mobile,
+  .show-on-mobile-inline {
+    display: inline-flex !important;
+  }
   select.show-on-mobile,
   #filter-month.show-on-mobile {
     display: block !important;
@@ -2240,7 +2244,9 @@ tbody td {
   .mobile-bottom-nav {
     display: none !important;
   }
-  .show-on-mobile {
+  .show-on-mobile,
+  button.show-on-mobile,
+  .show-on-mobile-inline {
     display: none !important;
   }
 }

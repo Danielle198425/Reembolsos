@@ -1449,7 +1449,7 @@ const ExpensesPage = {
           </label>
 
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button type="button" id="btn-take-photo" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;border-radius:8px;font-weight:600;">
+            <button type="button" id="btn-take-photo" class="btn btn-secondary btn-sm show-on-mobile" style="align-items:center;gap:6px;padding:8px 14px;font-size:13px;border-radius:8px;font-weight:600;">
               📷 Tirar Foto
             </button>
             <button type="button" id="btn-pick-file" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;border-radius:8px;font-weight:600;">
@@ -1527,11 +1527,7 @@ const ExpensesPage = {
         </div>
         <div class="field span-2 required" id="ef-desc-wrap">
           <label for="ef-description">Descrição</label>
-          <input type="text" id="ef-description" placeholder="Descreva a despesa..." value="${escHtml(expense?.description || '')}" maxlength="500" />
-        </div>
-        <div class="field span-2" id="ef-notes-wrap">
-          <label for="ef-notes">Observações</label>
-          <textarea id="ef-notes" rows="2" placeholder="Informações adicionais...">${escHtml(expense?.notes || '')}</textarea>
+          <textarea id="ef-description" rows="3" placeholder="Descreva a despesa..." maxlength="500" style="width:100%;min-height:75px;resize:vertical;">${escHtml(expense?.description || '')}</textarea>
         </div>
       </div>
 
@@ -1626,8 +1622,7 @@ const ExpensesPage = {
 
     const footer = `
       <button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
-      ${!id ? `<button class="btn btn-secondary hide-on-mobile" id="save-draft-btn">💾 Salvar Rascunho</button>` : ''}
-      <button class="btn btn-primary" id="save-submit-btn">${id ? '💾 Salvar' : '📤 Salvar e Submeter'}</button>
+      <button class="btn btn-primary" id="save-submit-btn">${id ? '💾 Salvar e Enviar' : '📤 Salvar e Enviar'}</button>
     `;
 
 
@@ -2162,7 +2157,7 @@ const ExpensesPage = {
       kmBlock.style.display   = 'block';
       amtWrap.style.display   = 'none';
       descWrap.style.display  = 'none';
-      notesWrap.style.display = 'none';
+      if (notesWrap) notesWrap.style.display = 'none';
       if(receiptWrap) receiptWrap.style.display = 'none';
       if(providerWrap) providerWrap.style.display = 'none';
       // Make standard fields not required for km
@@ -2174,7 +2169,7 @@ const ExpensesPage = {
       kmBlock.style.display   = 'none';
       amtWrap.style.display   = '';
       descWrap.style.display  = '';
-      notesWrap.style.display = '';
+      if (notesWrap) notesWrap.style.display = '';
       if(receiptWrap) receiptWrap.style.display = '';
       if(providerWrap) providerWrap.style.display = '';
       
@@ -2580,7 +2575,7 @@ const ExpensesPage = {
       let amtStr  = document.getElementById('ef-amount').value || '';
       amount      = parseFloat(amtStr.replace('R$ ', '').replace(/\\./g, '').replace(',', '.'));
       description = document.getElementById('ef-description').value.trim();
-      notes       = document.getElementById('ef-notes').value.trim();
+      notes       = document.getElementById('ef-notes') ? document.getElementById('ef-notes').value.trim() : '';
       provider    = document.getElementById('ef-provider')?.value.trim();
     }
 
@@ -2727,7 +2722,7 @@ const ExpensesPage = {
     } finally {
       this._selectedReceiptFile = null;
       saveBtn.disabled = false;
-      saveBtn.textContent = id ? '💾 Salvar' : '📤 Salvar e Submeter';
+      saveBtn.textContent = id ? '💾 Salvar e Enviar' : '📤 Salvar e Enviar';
     }
   },
 

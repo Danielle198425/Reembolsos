@@ -430,40 +430,47 @@ async function tryAutoLogin() {
   }
 }
 
-// Login form
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  const errEl = document.getElementById('login-error');
-  const btn = document.getElementById('login-btn');
-  const spinner = document.getElementById('login-spinner');
-  const btnText = document.getElementById('login-btn-text');
+// Login form (quando disponível)
+const loginFormEl = document.getElementById('login-form');
+if (loginFormEl && document.getElementById('login-email')) {
+  loginFormEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('login-email')?.value.trim();
+    const password = document.getElementById('login-password')?.value;
+    const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('login-btn');
+    const spinner = document.getElementById('login-spinner');
+    const btnText = document.getElementById('login-btn-text');
 
-  errEl.classList.add('hidden');
-  btn.disabled = true;
-  spinner.classList.remove('hidden');
-  btnText.textContent = 'Entrando...';
+    if (errEl) errEl.classList.add('hidden');
+    if (btn) btn.disabled = true;
+    if (spinner) spinner.classList.remove('hidden');
+    if (btnText) btnText.textContent = 'Entrando...';
 
-  try {
-    const res = await Api.login(email, password);
-    Api.setToken(res.access_token);
-    showApp(res.user);
-  } catch (err) {
-    errEl.textContent = err.message || 'Credenciais inválidas';
-    errEl.classList.remove('hidden');
-  } finally {
-    btn.disabled = false;
-    spinner.classList.add('hidden');
-    btnText.textContent = 'Entrar';
-  }
-});
+    try {
+      const res = await Api.login(email, password);
+      Api.setToken(res.access_token);
+      showApp(res.user);
+    } catch (err) {
+      if (errEl) {
+        errEl.textContent = err.message || 'Credenciais inválidas';
+        errEl.classList.remove('hidden');
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+      if (spinner) spinner.classList.add('hidden');
+      if (btnText) btnText.textContent = 'Entrar';
+    }
+  });
+}
 
-// Toggle password visibility
-document.getElementById('toggle-pw-btn').addEventListener('click', () => {
+// Toggle password visibility (quando disponível)
+document.getElementById('toggle-pw-btn')?.addEventListener('click', () => {
   const inp = document.getElementById('login-password');
+  if (!inp) return;
   inp.type = inp.type === 'password' ? 'text' : 'password';
-  document.getElementById('toggle-pw-btn').textContent = inp.type === 'password' ? '👁️' : '🙈';
+  const btn = document.getElementById('toggle-pw-btn');
+  if (btn) btn.textContent = inp.type === 'password' ? '👁️' : '🙈';
 });
 
 // Logout
