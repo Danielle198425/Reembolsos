@@ -13,16 +13,32 @@ _token_expires_at: float = 0.0
 DEFAULT_USER_AGENT = "MouraLeiteReembolsos/1.0 (reembolsos@mouraleite.com.br)"
 
 
+def _ensure_env_loaded():
+    """Carrega variáveis do arquivo .env caso não estejam no os.environ."""
+    if os.environ.get("AZURE_MAPS_CLIENT_ID"):
+        return
+    env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k, v = k.strip(), v.strip().strip('"').strip("'")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+        except Exception:
+            pass
+
+
 def is_azure_maps_configured() -> bool:
     """
     Verifica se o Azure Maps possui credenciais válidas configuradas no ambiente.
     Retorna False se o Client ID não estiver definido, estiver vazio ou for o placeholder '00000000-...'.
     """
+    _ensure_env_loaded()
     client_id = os.environ.get("AZURE_MAPS_CLIENT_ID", "").strip()
-    sub_key = os.environ.get("AZURE_MAPS_SUBSCRIPTION_KEY", "").strip()
-
-    if sub_key and not sub_key.startswith("00000000"):
-        return True
 
     if client_id and not client_id.startswith("00000000") and len(client_id) > 10:
         return True
@@ -32,14 +48,11 @@ def is_azure_maps_configured() -> bool:
 
 def get_azure_maps_headers() -> Optional[Dict[str, str]]:
     """
-    Retorna os headers de autenticação para o Azure Maps.
-    Prioriza autenticação gerenciada via Microsoft Entra ID (DefaultAzureCredential).
-    Suporta AZURE_MAPS_SUBSCRIPTION_KEY como contingência opcional.
+    Retorna os headers de autenticação para o Azure Maps utilizando exclusivamente
+    Microsoft Entra ID (DefaultAzureCredential no escopo https://atlas.microsoft.com/.default)
+    e o header x-ms-client-id. Não utiliza chaves compartilhadas (Shared Key).
     """
-    sub_key = os.environ.get("AZURE_MAPS_SUBSCRIPTION_KEY", "").strip()
-    if sub_key and not sub_key.startswith("00000000"):
-        return {"subscription-key": sub_key}
-
+    _ensure_env_loaded()
     client_id = os.environ.get("AZURE_MAPS_CLIENT_ID", "").strip()
     if not client_id or client_id.startswith("00000000"):
         return None
