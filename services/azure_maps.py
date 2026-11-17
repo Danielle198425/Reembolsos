@@ -10,7 +10,32 @@ logger = logging.getLogger(__name__)
 _cached_token: Optional[str] = None
 _token_expires_at: float = 0.0
 
+# Singleton de credencial Entra ID e de sessão HTTP com pooling
+_azure_credential = None
+_http_session: Optional[requests.Session] = None
+
 DEFAULT_USER_AGENT = "MouraLeiteReembolsos/1.0 (reembolsos@mouraleite.com.br)"
+
+
+def _get_azure_credential():
+    """Retorna instância singleton de DefaultAzureCredential para reaproveitamento de cache interno."""
+    global _azure_credential
+    if _azure_credential is None:
+        from azure.identity import DefaultAzureCredential
+        _azure_credential = DefaultAzureCredential()
+    return _azure_credential
+
+
+def _get_http_session() -> requests.Session:
+    """Retorna instância singleton de requests.Session com pool de conexões reutilizáveis (keep-alive)."""
+    global _http_session
+    if _http_session is None:
+        s = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=25, pool_maxsize=25, max_retries=1)
+        s.mount("https://", adapter)
+        s.mount("http://", adapter)
+        _http_session = s
+    return _http_session
 
 
 def _ensure_env_loaded():
@@ -67,8 +92,7 @@ def get_azure_maps_headers() -> Optional[Dict[str, str]]:
         }
 
     try:
-        from azure.identity import DefaultAzureCredential
-        credential = DefaultAzureCredential()
+        credential = _get_azure_credential()
         # Escopo oficial do Azure Maps para autenticação Entra ID
         token_obj = credential.get_token("https://atlas.microsoft.com/.default")
         _cached_token = token_obj.token
@@ -89,7 +113,7 @@ def _fallback_search_nominatim(query: str, limit: int = 5) -> List[Dict[str, Any
     """Fallback para busca de endereços via Nominatim (OpenStreetMap)."""
     try:
         url = "https://nominatim.openstreetmap.org/search"
-        resp = requests.get(
+        resp = _get_http_session().get(
             url,
             params={
                 "format": "json",
@@ -154,7 +178,7 @@ def _fallback_reverse_nominatim(lat: float, lon: float) -> Optional[Dict[str, An
     """Fallback para geocodificação reversa via Nominatim (OpenStreetMap)."""
     try:
         url = "https://nominatim.openstreetmap.org/reverse"
-        resp = requests.get(
+        resp = _get_http_session().get(
             url,
             params={
                 "format": "json",
@@ -196,7 +220,7 @@ def _fallback_route_osrm(
     """Fallback para cálculo de rota via OSRM público."""
     try:
         url = f"https://router.project-osrm.org/route/v1/driving/{lon_a},{lat_a};{lon_b},{lat_b}?overview=full&geometries=geojson"
-        resp = requests.get(url, headers={"User-Agent": DEFAULT_USER_AGENT}, timeout=10)
+        resp = _get_http_session().get(url, headers={"User-Agent": DEFAULT_USER_AGENT}, timeout=10)
         if resp.status_code != 200:
             return None
 
@@ -261,7 +285,7 @@ def search_address(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     }
 
     try:
-        resp = requests.get(url, params=params, headers=headers, timeout=8)
+        resp = _get_http_session().get(url, params=params, headers=headers, timeout=8)
         if resp.status_code == 429:
             logger.warning("[azure_maps] Limite de requisições (429) no Azure Maps. Acionando fallback.")
             return _fallback_search_nominatim(clean_query, limit=limit)
@@ -337,7 +361,7 @@ def reverse_geocode(lat: float, lon: float) -> Optional[Dict[str, Any]]:
     }
 
     try:
-        resp = requests.get(url, params=params, headers=headers, timeout=8)
+        resp = _get_http_session().get(url, params=params, headers=headers, timeout=8)
         if resp.status_code != 200:
             logger.warning(f"[azure_maps] Status {resp.status_code} no reverse geocode. Acionando fallback.")
             return _fallback_reverse_nominatim(lat, lon)
@@ -421,7 +445,7 @@ def calculate_route(
     }
 
     try:
-        resp = requests.get(url, params=params, headers=headers, timeout=12)
+        resp = _get_http_session().get(url, params=params, headers=headers, timeout=12)
         if resp.status_code == 429:
             logger.warning("[azure_maps] Limite de requisições (429) no cálculo de rotas. Acionando fallback OSRM.")
             res = _fallback_route_osrm(lat_a, lon_a, lat_b, lon_b, origin, dest)
@@ -507,7 +531,7 @@ def get_map_tile(z: int, x: int, y: int) -> Tuple[bytes, str]:
                 "language": "pt-BR"
             }
             try:
-                resp = requests.get(url, params=params, headers=headers, timeout=5)
+                resp = _get_http_session().get(url, params=params, headers=headers, timeout=5)
                 if resp.status_code == 200 and resp.content:
                     c_type = resp.headers.get("Content-Type", "image/png")
                     return resp.content, c_type
@@ -518,7 +542,7 @@ def get_map_tile(z: int, x: int, y: int) -> Tuple[bytes, str]:
 
     # Fallback para OpenStreetMap
     osm_url = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-    resp = requests.get(
+    resp = _get_http_session().get(
         osm_url,
         headers={"User-Agent": DEFAULT_USER_AGENT},
         timeout=6

@@ -11,6 +11,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_ENDPOINT = "https://di-reembolsos-mouraleite.cognitiveservices.azure.com/"
 
 _client = None
+_azure_credential = None
+
+
+def _get_azure_credential():
+    """Retorna instância singleton de DefaultAzureCredential para reaproveitamento de token cache."""
+    global _azure_credential
+    if _azure_credential is None:
+        from azure.identity import DefaultAzureCredential
+        _azure_credential = DefaultAzureCredential()
+    return _azure_credential
+
 
 def get_document_analysis_client():
     """
@@ -30,7 +41,6 @@ def get_document_analysis_client():
     try:
         from azure.ai.formrecognizer import DocumentAnalysisClient
         from azure.core.credentials import AzureKeyCredential
-        from azure.identity import DefaultAzureCredential
 
         api_key = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
         if api_key and api_key.strip():
@@ -38,7 +48,7 @@ def get_document_analysis_client():
             logger.info("Cliente Azure Document Intelligence inicializado com AzureKeyCredential de contingência.")
             return _client
 
-        credential = DefaultAzureCredential()
+        credential = _get_azure_credential()
         _client = DocumentAnalysisClient(endpoint=endpoint, credential=credential)
         logger.info("Cliente Azure Document Intelligence inicializado com DefaultAzureCredential (Entra ID).")
         return _client

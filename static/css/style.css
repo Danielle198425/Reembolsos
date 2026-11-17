@@ -2048,19 +2048,24 @@ tbody td {
     display: grid !important;
     grid-template-columns: repeat(4, 1fr) !important;
     width: 100% !important;
-    margin: 8px 0 10px 0 !important;
+    margin: 8px 0 12px 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     padding: 0 !important;
     justify-items: center !important;
     align-items: flex-start !important;
     gap: 4px !important;
+    box-sizing: border-box !important;
   }
   .dash-quick-actions button {
     width: 100% !important;
-    max-width: 84px !important;
+    max-width: 88px !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
+    justify-content: center !important;
     gap: 6px !important;
+    margin: 0 auto !important;
   }
   .dash-quick-actions .dash-quick-icon {
     width: 50px !important;

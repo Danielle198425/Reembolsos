@@ -1584,7 +1584,7 @@ const ExpensesPage = {
             <input type="text" id="ef-provider" placeholder="Nome do local / fornecedor" value="${escHtml(expense?.provider || '')}" />
           </div>
           <div class="field required">
-            <label for="ef-category">Categoria${opts.forceKm ? ' <span style="font-size:11px;color:var(--ml-pink,#e91e8c);font-weight:700;">🔒 fixado</span>' : ''}</label>
+            <label for="ef-category">Categoria</label>
             <select id="ef-category" onchange="ExpensesPage._onCategoryChange()" ${opts.forceKm ? 'disabled style="opacity:.75;cursor:not-allowed;"' : ''}>
               <option value="">Selecione...</option>
               ${cats.map(c => `<option value="${c.id}"
