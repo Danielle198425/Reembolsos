@@ -67,17 +67,17 @@ const DashboardPage = {
           </div>
         </div>
 
-        <div style="display:flex;gap:20px;text-align:center;align-items:flex-start;margin-left:auto;">
-          <!-- Carregar: abre formulário de nova despesa -->
-          <button id="dash-btn-carregar" title="Criar nova despesa" onclick="DashboardPage._onCarregar()" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0;">
+        <div class="dash-quick-actions">
+          <!-- Nova Despesa: abre formulário de nova despesa -->
+          <button id="dash-btn-carregar" title="Nova Despesa" onclick="DashboardPage._onCarregar()">
             <div class="dash-quick-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
             </div>
-            <span class="dash-quick-label">Carregar</span>
+            <span class="dash-quick-label">Nova Despesa</span>
           </button>
 
           <!-- Quilometragem: abre formulário com categoria km pré-selecionada e travada -->
-          <button id="dash-btn-km" title="Registrar despesa de quilometragem" onclick="DashboardPage._onQuilometragem()" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0;">
+          <button id="dash-btn-km" title="Registrar despesa de quilometragem" onclick="DashboardPage._onQuilometragem()">
             <div class="dash-quick-icon" style="color:var(--ml-pink,#e91e8c);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.333 8 14 8 14s8-8.667 8-14a8 8 0 0 0-8-8z"/></svg>
             </div>
@@ -85,7 +85,7 @@ const DashboardPage = {
           </button>
 
           <!-- Notificações -->
-          <button id="dash-btn-notif" title="Notificações de despesas" onclick="DashboardPage._onNotificacoes()" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0;position:relative;">
+          <button id="dash-btn-notif" title="Notificações de despesas" onclick="DashboardPage._onNotificacoes()">
             <div class="dash-quick-icon" id="dash-notif-icon" style="position:relative;">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span id="dash-notif-badge" class="notif-badge hidden">0</span>
@@ -94,7 +94,7 @@ const DashboardPage = {
           </button>
 
           <!-- Políticas: visualiza anexos de Central de Políticas em PDF -->
-          <button id="dash-btn-politicas" title="Políticas da Empresa" onclick="DashboardPage._onPoliticas()" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0;">
+          <button id="dash-btn-politicas" title="Políticas da Empresa" onclick="DashboardPage._onPoliticas()">
             <div class="dash-quick-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             </div>
@@ -148,7 +148,7 @@ const DashboardPage = {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card hide-on-mobile" id="dash-recent-card">
         <div class="card-header">
           <span class="card-title" id="dash-recent-title">🕒 Despesas Recentes</span>
           <button class="btn btn-sm btn-secondary" onclick="localStorage.setItem('ml_filter_expenses_tab', 'all'); if (typeof ExpensesPage !== 'undefined') ExpensesPage.currentTab = 'all'; navigate('expenses');">Ver todas →</button>

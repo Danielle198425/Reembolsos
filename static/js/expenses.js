@@ -1653,7 +1653,7 @@ const ExpensesPage = {
               <div id="km-dest-fav-prompt" class="km-fav-prompt" style="display:none;"></div>
             </div>
             <div class="field required span-2" style="margin-top:8px;">
-              <label for="km-notes">📝 Observação da Despesa *</label>
+              <label for="km-notes">📝 Observação da Despesa</label>
               <textarea id="km-notes" rows="2" placeholder="Informe a observação / motivo do deslocamento..." style="width:100%;" required>${escHtml(kmNotesVal)}</textarea>
             </div>
             <div class="field span-2" style="display:flex;align-items:center;gap:10px;margin-top:10px;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e2e8f0;">

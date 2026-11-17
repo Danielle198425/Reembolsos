@@ -673,6 +673,28 @@ img { max-width: 100%; }
 .stat-sub   { font-size: 12px; color: var(--text-4); }
 
 /* ── Dashboard Quick Action Buttons ──────────────────────────────────────── */
+.dash-quick-actions {
+  display: flex;
+  gap: 20px;
+  text-align: center;
+  align-items: flex-start;
+  margin-left: auto;
+}
+.dash-quick-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  position: relative;
+  transition: transform .15s ease;
+}
+.dash-quick-actions button:active {
+  transform: scale(0.95);
+}
 .dash-quick-icon {
   width: 48px; height: 48px; border-radius: 50%;
   background: var(--surface-2); border: 1px solid var(--border);
@@ -681,7 +703,7 @@ img { max-width: 100%; }
 }
 .dash-quick-icon:hover { background: #fff; border-color: var(--ml-indigo); color: var(--ml-indigo); }
 button:hover .dash-quick-icon { background: #fff; border-color: var(--ml-indigo); color: var(--ml-indigo); }
-.dash-quick-label { font-size: 11px; color: var(--text-3); font-weight: 600; }
+.dash-quick-label { font-size: 11px; color: var(--text-3); font-weight: 600; white-space: nowrap; }
 button:hover .dash-quick-label { color: var(--ml-indigo); }
 
 .notif-badge {
@@ -2016,6 +2038,49 @@ tbody td {
   }
 
   /* ── Dashboard responsive fixes on mobile ───────────────────────────────── */
+  .page-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 14px !important;
+    width: 100% !important;
+  }
+  .dash-quick-actions {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    width: 100% !important;
+    margin: 8px 0 10px 0 !important;
+    padding: 0 !important;
+    justify-items: center !important;
+    align-items: flex-start !important;
+    gap: 4px !important;
+  }
+  .dash-quick-actions button {
+    width: 100% !important;
+    max-width: 84px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+  .dash-quick-actions .dash-quick-icon {
+    width: 50px !important;
+    height: 50px !important;
+  }
+  .dash-quick-actions .dash-quick-label {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    text-align: center !important;
+    white-space: normal !important;
+    word-break: normal !important;
+    display: block !important;
+  }
+
+  /* Oculta despesas recentes da tela inicial no app */
+  #dash-recent-card,
+  .dash-recent-card {
+    display: none !important;
+  }
+
   .summary-bar {
     padding: 14px 16px !important;
     gap: 12px !important;
