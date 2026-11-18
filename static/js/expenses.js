@@ -599,7 +599,7 @@ const ExpensesPage = {
             e.status === 'rejeitado'
           );
         } else {
-          expenses = expenses.filter(e => e.status === 'aguardando_aprovacao' || e.status === 'rejeitado');
+          expenses = expenses.filter(e => e.status === 'aguardando_aprovacao' || e.status === 'aguardando_finalizacao' || e.status === 'aprovado' || e.status === 'rejeitado');
         }
       }
 
@@ -1147,6 +1147,7 @@ const ExpensesPage = {
       const flowStatuses = ['aguardando_aprovacao','aprovado','aguardando_finalizacao','finalizado','enviado','pago'];
       let normStatus = e.status === 'rejeitado' ? 'aguardando_aprovacao' : e.status;
       if (normStatus === 'rascunho' || normStatus === 'a_enviar') normStatus = 'aguardando_aprovacao';
+      if (normStatus === 'aprovado') normStatus = 'aguardando_finalizacao';
       const currentIdx = flowStatuses.indexOf(normStatus);
 
 
@@ -1175,7 +1176,7 @@ const ExpensesPage = {
       const html = `
         <div class="expense-detail">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-            ${statusBadge(e.status, viewStatusTooltip, viewStatusClass)}
+            ${statusBadge(e.status === 'aprovado' ? 'aguardando_finalizacao' : e.status, viewStatusTooltip, viewStatusClass)}
             <span class="detail-amount">${fmt(e.amount)}</span>
           </div>
 

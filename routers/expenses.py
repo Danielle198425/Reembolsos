@@ -46,7 +46,7 @@ STATUS_TRANSITIONS = {
     models.ExpenseStatus.aguardando_aprovacao: {
         "approve": (
             [models.UserRole.aprovador, models.UserRole.admin],
-            models.ExpenseStatus.aprovado
+            models.ExpenseStatus.aguardando_finalizacao
         ),
         "reject": (
             [models.UserRole.aprovador, models.UserRole.admin, models.UserRole.financeiro],
@@ -54,6 +54,10 @@ STATUS_TRANSITIONS = {
         ),
     },
     models.ExpenseStatus.aprovado: {
+        "approve": (
+            [models.UserRole.aprovador, models.UserRole.admin],
+            models.ExpenseStatus.aguardando_finalizacao
+        ),
         "finalize": (
             [models.UserRole.admin, models.UserRole.financeiro],
             models.ExpenseStatus.finalizado
@@ -298,6 +302,8 @@ def list_expenses(
         else:
             q = q.filter(models.Expense.status.in_([
                 models.ExpenseStatus.aguardando_aprovacao,
+                models.ExpenseStatus.aguardando_finalizacao,
+                models.ExpenseStatus.aprovado,
                 models.ExpenseStatus.rejeitado,
             ]))
     elif status_filter:

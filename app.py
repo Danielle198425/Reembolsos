@@ -109,6 +109,13 @@ def run_auto_migrations():
     except Exception as e:
         print(f"[migration] user_saved_addresses table init: {e}")
 
+    # Atualiza despesas com status 'aprovado' para 'aguardando_finalizacao'
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE expenses SET status = 'aguardando_finalizacao' WHERE status = 'aprovado'"))
+    except Exception as e:
+        print(f"[migration] update aprovado status: {e}")
+
     insp = inspect(engine)
     existing_tables = set(insp.get_table_names())
     cache = {}

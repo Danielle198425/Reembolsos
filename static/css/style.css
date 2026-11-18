@@ -1224,12 +1224,33 @@ tbody td {
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
 .empty-state {
-  text-align: center;
-  padding: 60px 24px;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  padding: 60px 24px !important;
   color: var(--text-4);
+  box-sizing: border-box !important;
 }
-.empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; display: block; }
-.empty-state p { font-size: 15px; }
+.empty-state .empty-icon {
+  font-size: 48px !important;
+  line-height: 1 !important;
+  margin: 0 auto 12px auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100% !important;
+}
+.empty-state p {
+  font-size: 15px !important;
+  text-align: center !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+}
 
 /* ── Loading overlay ─────────────────────────────────────────────────────── */
 .loading-row td {
@@ -1712,6 +1733,19 @@ tbody td {
     flex-direction: column !important;
     gap: 12px !important;
     width: 100% !important;
+  }
+
+  #expenses-table tbody tr:not(.expense-row) {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  #expenses-table tbody tr:not(.expense-row) td {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 !important;
+    border: none !important;
+    text-align: center !important;
   }
 
   #expenses-table tbody tr.expense-row {
