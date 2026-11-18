@@ -85,12 +85,12 @@ const DashboardPage = {
           </button>
 
           <!-- Notificações -->
-          <button id="dash-btn-notif" title="Notificações de despesas" onclick="DashboardPage._onNotificacoes()">
-            <div class="dash-quick-icon" id="dash-notif-icon" style="position:relative;">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              <span id="dash-notif-badge" class="notif-badge hidden">0</span>
+          <button id="dash-btn-notif" type="button" title="Notificações de despesas" onclick="window.openNotificationsModal ? window.openNotificationsModal() : (window.DashboardPage && DashboardPage._onNotificacoes())" style="cursor:pointer;-webkit-tap-highlight-color:transparent;">
+            <div class="dash-quick-icon" id="dash-notif-icon" style="position:relative;pointer-events:none;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span id="dash-notif-badge" class="notif-badge hidden" style="pointer-events:none;">0</span>
             </div>
-            <span class="dash-quick-label">Notificações</span>
+            <span class="dash-quick-label" style="pointer-events:none;">Notificações</span>
           </button>
 
           <!-- Políticas: visualiza anexos de Central de Políticas em PDF -->

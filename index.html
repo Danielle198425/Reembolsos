@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/style.css?v=71" />
+  <link rel="stylesheet" href="/static/css/style.css?v=95" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
@@ -26,33 +26,11 @@
      LOGIN SCREEN
 ════════════════════════════════════════════════════════════════════════════ -->
 <div id="login-screen" class="login-screen">
-  <!-- Fundo com Linhas Topográficas Douradas em SVG (Papel Timbrado Institucional Moura Leite) -->
-  <svg class="login-topographic-bg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <g fill="none" stroke-linecap="round">
-      <!-- Ondas e Curvas de Nível Topográficas Fluidas -->
-      <path d="M -150 980 C 180 880, 420 680, 780 620 C 1080 560, 1280 400, 1600 320" stroke="#C9A96E" stroke-width="1.3" opacity="0.45" />
-      <path d="M -150 930 C 200 830, 440 640, 800 580 C 1100 520, 1300 360, 1600 280" stroke="#D8BE8B" stroke-width="1.2" opacity="0.40" />
-      <path d="M -150 880 C 220 780, 460 600, 820 540 C 1120 480, 1320 320, 1600 240" stroke="#C9A96E" stroke-width="1.3" opacity="0.48" />
-      <path d="M -150 830 C 240 730, 480 560, 840 500 C 1140 440, 1340 280, 1600 200" stroke="#D8BE8B" stroke-width="1.2" opacity="0.38" />
-      <path d="M -150 780 C 260 680, 500 520, 860 460 C 1160 400, 1360 240, 1600 160" stroke="#C9A96E" stroke-width="1.4" opacity="0.52" />
-      <path d="M -150 730 C 280 630, 520 480, 880 420 C 1180 360, 1380 200, 1600 120" stroke="#D8BE8B" stroke-width="1.2" opacity="0.42" />
-      <path d="M -150 680 C 300 580, 540 440, 900 380 C 1200 320, 1400 160, 1600 80"  stroke="#C9A96E" stroke-width="1.3" opacity="0.46" />
-      <path d="M -150 630 C 320 530, 560 400, 920 340 C 1220 280, 1420 120, 1600 40"  stroke="#D8BE8B" stroke-width="1.2" opacity="0.36" />
-      <path d="M -150 580 C 340 480, 580 360, 940 300 C 1240 240, 1440 80,  1600 0"   stroke="#C9A96E" stroke-width="1.3" opacity="0.42" />
-
-      <!-- Linhas de Base Inferiores -->
-      <path d="M -150 1030 C 160 930, 400 720, 760 660 C 1060 600, 1260 440, 1600 360" stroke="#D8BE8B" stroke-width="1.2" opacity="0.38" />
-      <path d="M -150 1080 C 140 980, 380 760, 740 700 C 1040 640, 1240 480, 1600 400" stroke="#C9A96E" stroke-width="1.3" opacity="0.45" />
-      <path d="M -150 1130 C 120 1030, 360 800, 720 740 C 1020 680, 1220 520, 1600 440" stroke="#D8BE8B" stroke-width="1.2" opacity="0.35" />
-
-      <!-- Curvas Complementares Superiores -->
-      <path d="M 500 -60 C 800 120, 1100 100, 1600 -20" stroke="#C9A96E" stroke-width="1.2" opacity="0.40" />
-      <path d="M 550 -60 C 850 160, 1150 140, 1600 20"  stroke="#D8BE8B" stroke-width="1.2" opacity="0.35" />
-      <path d="M 600 -60 C 900 200, 1200 180, 1600 60"  stroke="#C9A96E" stroke-width="1.3" opacity="0.45" />
-      <path d="M 650 -60 C 950 240, 1250 220, 1600 100" stroke="#D8BE8B" stroke-width="1.1" opacity="0.35" />
-    </g>
-  </svg>
-
+  <div class="login-bg">
+    <div class="login-orb login-orb-1"></div>
+    <div class="login-orb login-orb-2"></div>
+    <div class="login-orb login-orb-3"></div>
+  </div>
   <div class="login-card">
     <div class="login-logo">
       <div class="logo-mark" id="login-logo-mark"><img src="/static/icons/logo-stacked.svg" style="max-height:100%; max-width:100%; object-fit:contain;" alt="Moura Leite" /></div>
@@ -65,10 +43,8 @@
     <p class="login-sub">Acesse com sua conta corporativa para continuar</p>
     <div id="login-error" class="login-error hidden" style="margin-bottom:12px;"></div>
     <div style="margin-top:20px;">
-      <a href="/api/auth/azure/login" id="btn-login-ms" class="btn-login-ms">
-        <span class="ms-icon-wrap">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
-        </span>
+      <a href="/api/auth/azure/login" id="btn-login-ms" class="btn btn-full" style="background:#ffffff;color:#1e293b;border:1.5px solid #cbd5e1;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:600;font-size:14px;text-decoration:none;padding:12px 16px;border-radius:10px;transition:all 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
         <span>Entrar com Microsoft (Entra ID)</span>
       </a>
     </div>
@@ -114,6 +90,12 @@
       </a>
     </nav>
 
+    <div style="padding: 0 12px 10px 12px;">
+      <button class="btn btn-sm btn-ghost push-notification-btn" id="btn-sidebar-push" onclick="window.togglePushNotifications ? window.togglePushNotifications(this) : (window.WebPush && WebPush.toggleSubscription(this))" style="width:100%;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px;background:var(--surface);cursor:pointer;">
+        🔔 Ativar Notificações
+      </button>
+    </div>
+
     <div class="sidebar-footer">
       <div class="user-info">
         <div class="user-avatar" id="sidebar-avatar">?</div>
@@ -157,8 +139,8 @@
       <span class="mobile-nav-label">Despesas</span>
     </a>
     <a href="#exports" class="mobile-nav-item" data-page="exports">
-      <span class="mobile-nav-icon">📤</span>
-      <span class="mobile-nav-label">Exportar</span>
+      <span class="mobile-nav-icon">📊</span>
+      <span class="mobile-nav-label">Relatórios</span>
     </a>
   </nav>
 </div>
@@ -192,12 +174,13 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="/static/js/api.js?v=68"></script>
-<script src="/static/js/dashboard.js?v=66"></script>
-<script src="/static/js/expenses.js?v=73"></script>
-<script src="/static/js/exports.js?v=65"></script>
-<script src="/static/js/payment_calendar.js?v=63"></script>
-<script src="/static/js/admin.js?v=79"></script>
-<script src="/static/js/app.js?v=68"></script>
+<script src="/static/js/api.js?v=98"></script>
+<script src="/static/js/push_manager.js?v=98"></script>
+<script src="/static/js/dashboard.js?v=98"></script>
+<script src="/static/js/expenses.js?v=98"></script>
+<script src="/static/js/exports.js?v=98"></script>
+<script src="/static/js/payment_calendar.js?v=98"></script>
+<script src="/static/js/admin.js?v=98"></script>
+<script src="/static/js/app.js?v=98"></script>
 </body>
 </html>
