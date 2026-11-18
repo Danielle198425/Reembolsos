@@ -941,7 +941,16 @@ const ExpensesPage = {
             ${impAlertBadge}
           </div>
         </td>
-        <td class="col-status" ${statusTooltip ? `title="${escHtml(statusTooltip)}" style="cursor:help;"` : ''}>${statusBadge(e.status, statusTooltip, statusExtraClass)}</td>
+        <td class="col-status" ${statusTooltip ? `title="${escHtml(statusTooltip)}" style="cursor:help;"` : ''}>
+          ${statusBadge(e.status, statusTooltip, statusExtraClass)}
+          ${(auditBadge || alertBadge || impAlertBadge) ? `
+            <span class="show-on-mobile-inline" style="display:none;align-items:center;gap:3px;margin-left:4px;vertical-align:middle;">
+              ${auditBadge}
+              ${alertBadge}
+              ${impAlertBadge}
+            </span>
+          ` : ''}
+        </td>
         <td class="col-date">${fmtDate(e.expense_date)}</td>
         <td class="col-user">
           <div style="display:flex;align-items:center;gap:8px;">
@@ -960,6 +969,14 @@ const ExpensesPage = {
         <td class="col-despesa"><span class="expense-description" title="${escHtml(e.description || displayDesc)}">${escHtml(displayDesc)}</span></td>
         <td class="col-actions">
           <div class="td-actions">
+            ${(auditBadge || alertBadge || impAlertBadge) ? `
+              <div class="mobile-alerts-badge show-on-mobile-inline" style="margin-right:auto;display:none;align-items:center;gap:5px;padding:4px 9px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:8px;cursor:pointer;" onclick="ExpensesPage.viewExpense(${e.id})" title="${escHtml(auditTooltip || alertTooltip || impAlertTooltip)}">
+                ${auditBadge}
+                ${alertBadge}
+                ${impAlertBadge}
+                <span style="font-size:11.5px;font-weight:700;color:#dc2626;letter-spacing:0.02em;">Alerta</span>
+              </div>
+            ` : ''}
             <button class="action-btn" title="Ver detalhes" data-action="view" data-id="${e.id}">👁</button>
             ${canApprove ? `
               <button class="action-btn success" title="Aprovar" data-action="approve" data-id="${e.id}">✔</button>
