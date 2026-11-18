@@ -964,13 +964,6 @@ const ExpensesPage = {
         </td>
         <td class="col-status" ${statusTooltip ? `title="${escHtml(statusTooltip)}" style="cursor:help;"` : ''}>
           ${statusBadge(e.status, statusTooltip, statusExtraClass)}
-          ${(auditBadge || alertBadge || impAlertBadge) ? `
-            <span class="show-on-mobile-inline" style="display:none;align-items:center;gap:3px;margin-left:4px;vertical-align:middle;">
-              ${auditBadge}
-              ${alertBadge}
-              ${impAlertBadge}
-            </span>
-          ` : ''}
         </td>
         <td class="col-date">${fmtDate(e.expense_date)}</td>
         <td class="col-user">
