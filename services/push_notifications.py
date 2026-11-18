@@ -28,14 +28,20 @@ def _load_env_fallback():
 
 _load_env_fallback()
 
-VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
-VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
-VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:suporte@mouraleite.com.br")
+DEFAULT_VAPID_PUBLIC_KEY = "BBRP6hAkINeUwNCNC3HDjjgYw1NRkPIZQ_c3g3cE9Wt0SLQWsvETV4DGgCqXI1ZYan56alcKa6URwayIT0rHT-g"
+DEFAULT_VAPID_PRIVATE_KEY = "N43ahZXNAbhAmSNRBdWpTrS9fMELd04v4lAkisme_tI"
+DEFAULT_VAPID_CLAIMS_EMAIL = "mailto:suporte@mouraleite.com.br"
+
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", DEFAULT_VAPID_PUBLIC_KEY)
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", DEFAULT_VAPID_PRIVATE_KEY)
+VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", DEFAULT_VAPID_CLAIMS_EMAIL)
 
 
 def get_vapid_public_key() -> str:
-    """Retorna a chave pública VAPID configurada."""
-    return os.getenv("VAPID_PUBLIC_KEY", VAPID_PUBLIC_KEY).strip()
+    """Retorna a chave pública VAPID configurada, limpa de aspas ou espaços."""
+    raw = os.getenv("VAPID_PUBLIC_KEY", "") or VAPID_PUBLIC_KEY or DEFAULT_VAPID_PUBLIC_KEY
+    clean = str(raw).strip().strip('"').strip("'").strip()
+    return clean if len(clean) > 50 else DEFAULT_VAPID_PUBLIC_KEY
 
 
 def send_user_push(
@@ -50,8 +56,10 @@ def send_user_push(
     Remove automaticamente inscrições expiradas ou canceladas (HTTP 404/410).
     Retorna a quantidade de notificações enviadas com sucesso.
     """
-    priv_key = os.getenv("VAPID_PRIVATE_KEY", VAPID_PRIVATE_KEY).strip()
-    claims_email = os.getenv("VAPID_CLAIMS_EMAIL", VAPID_CLAIMS_EMAIL).strip()
+    raw_priv = os.getenv("VAPID_PRIVATE_KEY", "") or VAPID_PRIVATE_KEY or DEFAULT_VAPID_PRIVATE_KEY
+    priv_key = str(raw_priv).strip().strip('"').strip("'").strip()
+    raw_claims = os.getenv("VAPID_CLAIMS_EMAIL", "") or VAPID_CLAIMS_EMAIL or DEFAULT_VAPID_CLAIMS_EMAIL
+    claims_email = str(raw_claims).strip().strip('"').strip("'").strip()
 
     if not priv_key:
         logger.warning("[WebPush] VAPID_PRIVATE_KEY não configurada. Notificação não enviada.")

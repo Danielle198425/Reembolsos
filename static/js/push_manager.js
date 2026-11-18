@@ -8,6 +8,15 @@ const WebPush = {
   _isBusy: false,
 
   urlBase64ToUint8Array(base64String) {
+    if (!base64String || typeof base64String !== 'string') {
+      base64String = DEFAULT_VAPID_PUBLIC_KEY;
+    }
+    // Remove qualquer aspas, quebras de linha e espaços acidentais
+    base64String = base64String.replace(/[\s\r\n"']/g, '');
+    if (base64String.length < 50) {
+      base64String = DEFAULT_VAPID_PUBLIC_KEY;
+    }
+
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding)
       .replace(/\-/g, '+')
@@ -17,6 +26,12 @@ const WebPush = {
     for (let i = 0; i < rawData.length; ++i) {
       outputArray[i] = rawData.charCodeAt(i);
     }
+
+    // Se por qualquer motivo não for um ponto P-256 válido (65 bytes iniciando em 0x04), recorre à chave padrão
+    if ((outputArray.length !== 65 || outputArray[0] !== 4) && base64String !== DEFAULT_VAPID_PUBLIC_KEY) {
+      return this.urlBase64ToUint8Array(DEFAULT_VAPID_PUBLIC_KEY);
+    }
+
     return outputArray;
   },
 
@@ -256,15 +271,21 @@ const WebPush = {
         throw new Error('Service Worker / PushManager não disponível.');
       }
 
-      // Obter ou criar inscrição
+      // Obter ou renovar inscrição
       let sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-        const convertedKey = this.urlBase64ToUint8Array(vapidKey);
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: convertedKey
-        });
+      if (sub) {
+        try {
+          await sub.unsubscribe();
+        } catch (unsubErr) {
+          console.warn('[WebPush] Falha ao limpar subscrição antiga:', unsubErr);
+        }
       }
+
+      const convertedKey = this.urlBase64ToUint8Array(vapidKey);
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedKey
+      });
 
       if (!sub) {
         throw new Error('Falha ao gerar credencial push no navegador.');
