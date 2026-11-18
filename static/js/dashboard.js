@@ -297,7 +297,7 @@ const DashboardPage = {
     try {
       notifs = await Api.getNotifications();
     } catch(e) {
-      toast('Erro ao carregar notificações.', 'error');
+      console.warn('Erro ao carregar notificações:', e);
     }
 
     const statusIcons = {
@@ -345,7 +345,7 @@ const DashboardPage = {
           <span style="font-size:18px;">📲</span>
           <span style="font-size:13px;color:var(--text-1);font-weight:600;">Alertas no navegador e celular</span>
         </div>
-        <button class="btn btn-sm btn-ghost push-notification-btn" onclick="PushManager.toggleSubscription()" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);">
+        <button class="btn btn-sm btn-ghost push-notification-btn" onclick="window.PushManager ? PushManager.toggleSubscription(this) : null" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);">
           🔔 Ativar Notificações
         </button>
       </div>
