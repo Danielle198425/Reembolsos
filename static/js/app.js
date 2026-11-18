@@ -182,6 +182,8 @@ const Modal = {
     });
   },
 };
+window.Modal = Modal;
+window.toast = toast;
 
 document.getElementById('modal-close-btn').addEventListener('click', Modal.close);
 let mousedownOnOverlay = false;

@@ -5,6 +5,7 @@ const DEFAULT_VAPID_PUBLIC_KEY = 'BBRP6hAkINeUwNCNC3HDjjgYw1NRkPIZQ_c3g3cE9Wt0SL
 
 const WebPush = {
   _vapidPublicKey: null,
+  _isBusy: false,
 
   urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -47,7 +48,7 @@ const WebPush = {
         ]);
         if (readyReg) reg = readyReg;
       } catch (timeoutErr) {
-        // Prossegue com reg existente
+        // Prossegue com o reg obtido
       }
       return reg;
     } catch (e) {
@@ -94,113 +95,151 @@ const WebPush = {
     }
   },
 
+  /**
+   * Ponto de entrada do clique do usuário.
+   * CRÍTICO: Notification.requestPermission() DEVE ser chamado no primeiro ciclo síncrono
+   * do clique do usuário para preservar a Transient User Activation nos navegadores.
+   */
+  async toggleSubscription(btn = null) {
+    if (this._isBusy) return;
+    this._isBusy = true;
+
+    try {
+      // 0. Conexão HTTPS
+      if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        const modalFn = (window.Modal && window.Modal.open) || alert;
+        modalFn(
+          '⚠️ Conexão Não Segura',
+          `Os navegadores exigem uma conexão HTTPS segura para permitir notificações push.<br><br>Por favor acesse o sistema através de https://.`
+        );
+        return;
+      }
+
+      // 1. Caso especial iPhone
+      if (this.isIos() && !this.isStandalone()) {
+        if (window.Modal && window.Modal.open) {
+          Modal.open(
+            '🔔 Notificações no iPhone',
+            `
+            <div style="padding:10px 0;text-align:center;">
+              <div style="font-size:48px;margin-bottom:12px;">📱</div>
+              <h3 style="font-size:16px;font-weight:700;color:var(--text-1);margin-bottom:8px;">Instale o atalho na tela inicial</h3>
+              <p style="font-size:14px;color:var(--text-2);line-height:1.5;margin-bottom:16px;">
+                No iPhone/iPad, a Apple exige que o sistema seja adicionado à <strong>Tela de Início</strong> para permitir notificações push.
+              </p>
+              <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:left;font-size:13px;color:var(--text-1);line-height:1.6;">
+                <strong>Como ativar no iPhone:</strong><br>
+                1. Toque no botão de <strong>Compartilhar</strong> (ícone <span style="font-size:16px;">⎋</span> ou quadrado com seta para cima na barra do Safari).<br>
+                2. Role para baixo e selecione <strong>"Adicionar à Tela de Início"</strong>.<br>
+                3. Abra o app pelo ícone criado na tela inicial e clique em <strong>Ativar Notificações</strong>.
+              </div>
+            </div>
+            `,
+            '<button class="btn btn-primary" onclick="Modal.close()">Entendido</button>'
+          );
+        } else {
+          alert('No iPhone, adicione o app à Tela de Início (Compartilhar > Adicionar à Tela de Início) para receber notificações.');
+        }
+        return;
+      }
+
+      // 2. Verificação de suporte à Notification API
+      if (!('Notification' in window)) {
+        if (window.Modal && window.Modal.open) {
+          Modal.open(
+            '🔔 Notificações Não Suportadas',
+            `<p style="padding:12px;text-align:center;color:var(--text-2);">Seu navegador atual não suporta notificações nativas.</p>`,
+            '<button class="btn btn-primary" onclick="Modal.close()">Fechar</button>'
+          );
+        } else {
+          alert('Seu navegador não suporta notificações.');
+        }
+        return;
+      }
+
+      // 3. Verificação do estado de permissão atual
+      const currentPerm = Notification.permission;
+
+      if (currentPerm === 'denied') {
+        if (window.Modal && window.Modal.open) {
+          Modal.open(
+            '🔔 Notificações Bloqueadas',
+            `
+            <div style="padding:10px 0;text-align:center;">
+              <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
+              <h3 style="font-size:16px;font-weight:700;color:var(--text-1);margin-bottom:8px;">Permissão bloqueada no navegador</h3>
+              <p style="font-size:14px;color:var(--text-2);line-height:1.5;">
+                As notificações estão marcadas como bloqueadas nas configurações do seu navegador para este site.<br><br>
+                Para ativar, clique no ícone de <strong>cadeado ou configurações</strong> ao lado da barra de endereço do navegador e altere a opção <strong>Notificações</strong> para <strong>Permitir</strong>.
+              </p>
+            </div>
+            `,
+            '<button class="btn btn-primary" onclick="Modal.close()">Fechar</button>'
+          );
+        } else {
+          alert('As notificações estão bloqueadas nas configurações do seu navegador. Clique no cadeado ao lado da URL e selecione Permitir.');
+        }
+        return;
+      }
+
+      // 4. Se a permissão for 'default' (ainda não solicitada), SOLICITAR IMEDIATAMENTE (sem await prévio!)
+      if (currentPerm === 'default') {
+        if (btn) btn.innerHTML = '⏳ Solicitando...';
+        
+        let reqPromise = null;
+        try {
+          reqPromise = Notification.requestPermission();
+        } catch (e) {
+          // Fallback callback para versões antigas
+          reqPromise = new Promise(res => Notification.requestPermission(res));
+        }
+
+        const newPerm = await reqPromise;
+
+        if (newPerm !== 'granted') {
+          if (typeof toast === 'function') {
+            toast('Permissão de notificações não concedida.', 'info');
+          }
+          await this.updateButtonsState();
+          return;
+        }
+      }
+
+      // 5. Se já tem permissão concedida, verificar se já está inscrito ou se quer desativar
+      const isSub = await this.isSubscribed();
+      if (isSub) {
+        if (window.Modal && window.Modal.confirm) {
+          Modal.confirm(
+            'Desativar Notificações',
+            'Deseja desativar as notificações push neste dispositivo?',
+            () => this.unsubscribe(btn),
+            () => this.updateButtonsState()
+          );
+        } else if (confirm('Deseja desativar as notificações push neste dispositivo?')) {
+          await this.unsubscribe(btn);
+        }
+      } else {
+        await this.subscribe(btn);
+      }
+    } catch (err) {
+      console.error('[WebPush] Erro no toggleSubscription:', err);
+      if (typeof toast === 'function') {
+        toast('Erro ao processar notificações: ' + (err.message || 'Falha'), 'error');
+      }
+    } finally {
+      this._isBusy = false;
+      await this.updateButtonsState();
+    }
+  },
+
   async subscribe(triggerBtn = null) {
-    // 0. Conexão HTTPS
-    if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      Modal.open(
-        '⚠️ Conexão Não Segura',
-        `
-        <div style="padding:10px 0;text-align:center;">
-          <div style="font-size:44px;margin-bottom:12px;">🔒</div>
-          <h3 style="font-size:16px;font-weight:700;color:var(--text-1);margin-bottom:8px;">HTTPS Obrigatório</h3>
-          <p style="font-size:14px;color:var(--text-2);line-height:1.5;">
-            Os navegadores exigem uma conexão segura com <strong>HTTPS</strong> para permitir notificações push nativas.<br><br>
-            Por favor acesse o sistema através de seu endereço HTTPS seguro.
-          </p>
-        </div>
-        `,
-        '<button class="btn btn-primary" onclick="Modal.close()">Entendido</button>'
-      );
-      return false;
-    }
-
-    // 1. Caso especial: iPhone / iPad no Safari sem adicionar à tela inicial
-    if (this.isIos() && !this.isStandalone()) {
-      Modal.open(
-        '🔔 Notificações no iPhone',
-        `
-        <div style="padding:10px 0;text-align:center;">
-          <div style="font-size:48px;margin-bottom:12px;">📱</div>
-          <h3 style="font-size:16px;font-weight:700;color:var(--text-1);margin-bottom:8px;">Instale o atalho na tela inicial</h3>
-          <p style="font-size:14px;color:var(--text-2);line-height:1.5;margin-bottom:16px;">
-            No iPhone/iPad, o iOS exige que o sistema seja adicionado à <strong>Tela de Início</strong> para permitir notificações push.
-          </p>
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:left;font-size:13px;color:var(--text-1);line-height:1.6;">
-            <strong>Como ativar no iPhone:</strong><br>
-            1. Toque no botão de <strong>Compartilhar</strong> (ícone <span style="font-size:16px;">⎋</span> ou quadrado com seta para cima na barra do Safari).<br>
-            2. Role para baixo e selecione <strong>"Adicionar à Tela de Início"</strong>.<br>
-            3. Abra o app pelo ícone Moura Leite criado na sua tela inicial e clique em <strong>Ativar Notificações</strong>.
-          </div>
-        </div>
-        `,
-        '<button class="btn btn-primary" onclick="Modal.close()">Entendido</button>'
-      );
-      return false;
-    }
-
-    if (!('Notification' in window)) {
-      Modal.open(
-        '🔔 Notificações Não Suportadas',
-        `
-        <div style="padding:10px 0;text-align:center;">
-          <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
-          <h3 style="font-size:16px;font-weight:700;color:var(--text-1);margin-bottom:8px;">Navegador Incompatível</h3>
-          <p style="font-size:14px;color:var(--text-2);line-height:1.5;">
-            Seu navegador atual não possui suporte à API nativa de Notificações Web. Recomendamos o uso do <strong>Google Chrome</strong>, <strong>Microsoft Edge</strong> ou <strong>Safari</strong> atualizado.
-          </p>
-        </div>
-        `,
-        '<button class="btn btn-primary" onclick="Modal.close()">Entendido</button>'
-      );
-      return false;
-    }
-
-    // 2. Solicitar permissão imediatamente
-    let permission = Notification.permission;
-    if (permission === 'denied') {
-      Modal.open(
-        '🔔 Notificações Bloqueadas',
-        `
-        <div style="padding:10px 0;text-align:center;">
-          <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
-          <h3 style="font-size:16px;font-weight:700;color:var(--text-1);margin-bottom:8px;">Permissão bloqueada no navegador</h3>
-          <p style="font-size:14px;color:var(--text-2);line-height:1.5;">
-            As notificações estão marcadas como bloqueadas nas configurações do seu navegador para este site.<br><br>
-            Para ativar, clique no ícone de <strong>cadeado ou configurações</strong> ao lado da barra de endereço do navegador e altere a opção <strong>Notificações</strong> para <strong>Permitir</strong>.
-          </p>
-        </div>
-        `,
-        '<button class="btn btn-primary" onclick="Modal.close()">Fechar</button>'
-      );
-      return false;
-    }
-
-    // Feedback visual imediato no botão
     if (triggerBtn) {
-      triggerBtn.innerHTML = '⏳ Solicitando...';
+      triggerBtn.innerHTML = '⏳ Ativando...';
       triggerBtn.disabled = true;
     }
 
-    if (permission !== 'granted') {
-      try {
-        permission = await Notification.requestPermission();
-      } catch (e) {
-        permission = await new Promise(resolve => Notification.requestPermission(resolve));
-      }
-    }
-
-    if (permission !== 'granted') {
-      if (typeof toast === 'function') toast('Permissão de notificações não concedida.', 'info');
-      await this.updateButtonsState();
-      return false;
-    }
-
-    if (triggerBtn) {
-      triggerBtn.innerHTML = '⏳ Registrando...';
-    }
-
     try {
-      // 3. Obter VAPID Public Key
+      // Obter chave pública VAPID
       if (!this._vapidPublicKey) {
         try {
           const resp = await Api.getVapidPublicKey();
@@ -209,35 +248,29 @@ const WebPush = {
           this._vapidPublicKey = DEFAULT_VAPID_PUBLIC_KEY;
         }
       }
-
       const vapidKey = this._vapidPublicKey || DEFAULT_VAPID_PUBLIC_KEY;
 
-      // 4. Obter registro do Service Worker
+      // Obter Service Worker
       const reg = await this.getServiceWorkerRegistration();
-      if (!reg) {
-        throw new Error('Service Worker não registrado neste navegador.');
+      if (!reg || !reg.pushManager) {
+        throw new Error('Service Worker / PushManager não disponível.');
       }
 
-      // 5. Obter ou criar Push Subscription
-      let sub = null;
-      if (reg.pushManager) {
-        sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          const convertedVapidKey = this.urlBase64ToUint8Array(vapidKey);
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: convertedVapidKey
-          });
-        }
-      } else {
-        throw new Error('PushManager indisponível no navegador.');
+      // Obter ou criar inscrição
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const convertedKey = this.urlBase64ToUint8Array(vapidKey);
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedKey
+        });
       }
 
       if (!sub) {
-        throw new Error('Não foi possível gerar a inscrição de push.');
+        throw new Error('Falha ao gerar credencial push no navegador.');
       }
 
-      // 6. Enviar a inscrição para o backend
+      // Enviar ao backend
       const subJson = sub.toJSON();
       await Api.subscribePush({
         endpoint: subJson.endpoint,
@@ -246,21 +279,20 @@ const WebPush = {
       });
 
       if (typeof toast === 'function') {
-        toast('Notificações push ativadas com sucesso neste dispositivo!', 'success');
+        toast('Notificações ativadas com sucesso neste dispositivo!', 'success');
       }
-      await this.updateButtonsState();
       return true;
     } catch (err) {
-      console.error('[WebPush] Erro ao registrar push:', err);
+      console.error('[WebPush] Erro em subscribe:', err);
       if (typeof toast === 'function') {
         toast('Erro ao ativar notificações: ' + (err.message || 'Falha no registro'), 'error');
       }
-      await this.updateButtonsState();
       return false;
     } finally {
       if (triggerBtn) {
         triggerBtn.disabled = false;
       }
+      await this.updateButtonsState();
     }
   },
 
@@ -269,6 +301,7 @@ const WebPush = {
       triggerBtn.innerHTML = '⏳ Desativando...';
       triggerBtn.disabled = true;
     }
+
     try {
       const reg = await this.getServiceWorkerRegistration();
       if (reg && reg.pushManager) {
@@ -279,66 +312,33 @@ const WebPush = {
           await Api.unsubscribePush(endpoint);
         }
       }
+
       if (typeof toast === 'function') {
-        toast('Notificações push desativadas neste dispositivo.', 'info');
+        toast('Notificações desativadas neste dispositivo.', 'info');
       }
-      await this.updateButtonsState();
+      return true;
     } catch (err) {
-      console.error('[WebPush] Erro ao desinscrever:', err);
+      console.error('[WebPush] Erro em unsubscribe:', err);
       if (typeof toast === 'function') {
         toast('Erro ao desativar notificações.', 'error');
       }
-      await this.updateButtonsState();
+      return false;
     } finally {
       if (triggerBtn) {
         triggerBtn.disabled = false;
       }
-    }
-  },
-
-  async toggleSubscription(btn = null) {
-    if (btn) {
-      btn.disabled = true;
-    }
-    try {
-      const isSub = await this.isSubscribed();
-      if (btn) btn.disabled = false;
-
-      if (isSub) {
-        Modal.confirm(
-          'Desativar Notificações',
-          'Deseja desativar as notificações push neste dispositivo?',
-          () => this.unsubscribe(btn),
-          () => this.updateButtonsState()
-        );
-      } else {
-        await this.subscribe(btn);
-      }
-    } catch (err) {
-      console.error('[WebPush] Erro no toggle:', err);
-      if (btn) btn.disabled = false;
-      await this.subscribe(btn);
+      await this.updateButtonsState();
     }
   }
 };
 
-// Expor explicitamente no objeto global window
+// Exportações globais
 window.WebPush = WebPush;
 window.togglePushNotifications = function(btn) {
   return WebPush.toggleSubscription(btn);
 };
 
-// Event listener global para cliques em qualquer botão com a classe .push-notification-btn
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest && e.target.closest('.push-notification-btn');
-  if (btn) {
-    e.preventDefault();
-    e.stopPropagation();
-    WebPush.toggleSubscription(btn);
-  }
-});
-
-// Inicializar estado dos botões ao carregar a página
+// Inicialização automática
 window.addEventListener('DOMContentLoaded', () => {
   WebPush.updateButtonsState();
 });

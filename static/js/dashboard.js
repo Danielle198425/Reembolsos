@@ -606,3 +606,19 @@ const DashboardPage = {
       </div>`;
   },
 };
+
+window.DashboardPage = DashboardPage;
+window.openNotificationsModal = function() {
+  if (window.DashboardPage && window.DashboardPage._onNotificacoes) {
+    window.DashboardPage._onNotificacoes();
+  }
+};
+
+// Delegador global garantido para o botão de notificações do painel
+document.addEventListener('click', (e) => {
+  const notifBtn = e.target.closest && e.target.closest('#dash-btn-notif');
+  if (notifBtn) {
+    e.preventDefault();
+    DashboardPage._onNotificacoes();
+  }
+});
