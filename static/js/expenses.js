@@ -1019,11 +1019,6 @@ const ExpensesPage = {
               <button class="action-btn danger" title="Recusar despesa" data-action="reject" data-id="${e.id}">✘</button>
             ` : ''}
             ${canFinalize ? `<button class="action-btn hide-on-mobile" title="Finalizar despesa" data-action="finalize" data-id="${e.id}" style="color:var(--purple);">🏁</button>` : ''}
-            ${(isAdminOrFinance && (e.status === 'finalizado' || e.status === 'aprovado' || e.status === 'aguardando_finalizacao') && !e.sienge_title) ? `
-              <button class="action-btn hide-on-mobile" title="Gerar Título no Sienge" data-action="send-sienge" data-id="${e.id}" style="color:#006633;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-              </button>
-            ` : ''}
             ${canResubmit ? `<button class="action-btn hide-on-mobile" title="Reenviar" data-action="resubmit" data-id="${e.id}" style="color:var(--amber);">↩</button>` : ''}
             ${canEdit ? `<button class="action-btn" title="Editar despesa" data-action="edit" data-id="${e.id}"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ml-indigo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>` : ''}
             ${canDelete ? `
