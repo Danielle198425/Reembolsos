@@ -851,18 +851,38 @@ const ExpensesPage = {
 
   _rowHTML(e, checkedIds = null) {
     const isAdminOrFinance = App.user?.role === 'admin' || App.user?.role === 'financeiro';
+    const isAdmin = App.user?.role === 'admin';
+    const isFinance = App.user?.role === 'financeiro';
+    const isApprover = App.user?.role === 'aprovador';
+    const isSelf = e.user_id === App.user?.id;
+
     const isLockedFromEdit = e.status === 'enviado' || e.status === 'pago';
     const isFinalized = e.status === 'finalizado' || isLockedFromEdit;
-    const canEdit = !isLockedFromEdit && (App.user?.role === 'admin' || (!isFinalized && (e.user_id === App.user?.id || App.user?.role === 'aprovador' || App.user?.role === 'financeiro')));
-    const isSelf = e.user_id === App.user?.id;
-    const canApprove = (App.user?.role === 'admin' || (App.user?.role === 'aprovador' && !isSelf)) &&
+
+    // Editar: Somente o criador da própria despesa (se não finalizada/paga) ou o Administrador (com exceção do adm, nenhum usuário pode editar despesa de outro)
+    const canEdit = !isLockedFromEdit && (
+      isAdmin ||
+      (!isFinalized && isSelf)
+    );
+
+    const canApprove = (isAdmin || (isApprover && !isSelf)) &&
                        e.status === 'aguardando_aprovacao';
-    const canReject = (App.user?.role === 'admin' || App.user?.role === 'financeiro' || (App.user?.role === 'aprovador' && !isSelf)) &&
-                      (e.status === 'aguardando_aprovacao' || e.status === 'aguardando_finalizacao' || e.status === 'aprovado');
+
+    // Recusar:
+    // - Administrador pode recusar em aguardando_aprovacao, aguardando_finalizacao ou aprovado
+    // - Financeiro pode recusar durante a finalização (aguardando_finalizacao ou aprovado)
+    // - Aprovador SÓ pode recusar enquanto a despesa estiver aguardando aprovação (nunca após aprovada!)
+    const canReject = isAdmin
+      ? (e.status === 'aguardando_aprovacao' || e.status === 'aguardando_finalizacao' || e.status === 'aprovado')
+      : (isFinance
+          ? (e.status === 'aguardando_finalizacao' || e.status === 'aprovado')
+          : (isApprover && !isSelf && e.status === 'aguardando_aprovacao')
+        );
+
     const canFinalize = isAdminOrFinance && (e.status === 'aguardando_finalizacao' || e.status === 'aprovado');
     const canPay = false;
-    const canDelete = (e.user_id === App.user?.id || isAdminOrFinance);
-    const canResubmit = e.status === 'rejeitado' && (e.user_id === App.user?.id || isAdminOrFinance);
+    const canDelete = (isSelf || isAdminOrFinance);
+    const canResubmit = e.status === 'rejeitado' && (isSelf || isAdminOrFinance);
 
     let statusTooltip = '';
     let statusExtraClass = '';
@@ -1103,6 +1123,18 @@ const ExpensesPage = {
 
 
   async _openRejectModal(id) {
+    const exp = (this.loadedExpenses || []).find(e => e.id === id);
+    const isAdmin = App.user?.role === 'admin';
+    const isApprover = App.user?.role === 'aprovador';
+    const isSelf = exp && exp.user_id === App.user?.id;
+
+    if (exp && isApprover && !isAdmin) {
+      if (isSelf || exp.status !== 'aguardando_aprovacao') {
+        toast('Aprovadores só podem recusar despesas pendentes de aprovação.', 'warning');
+        return;
+      }
+    }
+
     let reasons = [];
     try {
       reasons = await Api.getRejectionReasons();
@@ -1449,6 +1481,10 @@ const ExpensesPage = {
         expense = await Api.getExpense(id);
         if (expense && (expense.status === 'enviado' || expense.status === 'pago')) {
           toast('Despesas com status "Enviado para Pagamento" ou "Pago" não podem ser editadas.', 'warning');
+          return;
+        }
+        if (expense && App.user?.role !== 'admin' && expense.user_id !== App.user?.id) {
+          toast('Apenas o criador da despesa ou o administrador podem editá-la.', 'error');
           return;
         }
       } catch(e) { toast(e.message, 'error'); return; }

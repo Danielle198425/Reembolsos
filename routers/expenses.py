@@ -499,8 +499,8 @@ def update_expense(
     expense = models.Expense.filter(models.Expense.id == expense_id).first() if hasattr(models.Expense, 'filter') else db.query(models.Expense).filter(models.Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(404, "Despesa não encontrada")
-    if expense.user_id != current_user.id and current_user.role not in [models.UserRole.admin, models.UserRole.aprovador, models.UserRole.financeiro]:
-        raise HTTPException(403, "Acesso negado")
+    if expense.user_id != current_user.id and current_user.role != models.UserRole.admin:
+        raise HTTPException(403, "Apenas o proprietário da despesa ou o administrador podem editá-la.")
     if expense.status in [models.ExpenseStatus.enviado, models.ExpenseStatus.pago]:
         raise HTTPException(400, "Despesas com status 'Enviado para Pagamento' ou 'Pago' não podem ser editadas.")
     if expense.status == models.ExpenseStatus.finalizado and current_user.role != models.UserRole.admin:
@@ -699,6 +699,10 @@ def _transition(
     if action in ["approve", "reject"] and current_user.role != models.UserRole.admin:
         if expense.user_id == current_user.id:
             raise HTTPException(403, "Não é permitido aprovar ou reprovar a sua própria despesa.")
+
+    # Aprovador só pode recusar se a despesa estiver aguardando aprovação (nunca após aprovada)
+    if action == "reject" and current_user.role == models.UserRole.aprovador and expense.status != models.ExpenseStatus.aguardando_aprovacao:
+        raise HTTPException(403, "Aprovadores só podem recusar despesas que estejam aguardando aprovação.")
 
     # Perfil Financeiro não aprova despesa de nenhum usuário (apenas rejeitar, finalizar, exportar e enviar para pagamento)
     if action == "approve" and current_user.role == models.UserRole.financeiro:
