@@ -109,6 +109,15 @@ def run_auto_migrations():
     except Exception as e:
         print(f"[migration] user_saved_addresses table init: {e}")
 
+    # Migrações adicionais de tipo e constraints no Postgres
+    if not IS_SQLITE:
+        try:
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                conn.execute(text("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'financeiro';"))
+                conn.execute(text("ALTER TYPE expensestatus ADD VALUE IF NOT EXISTS 'aguardando_finalizacao';"))
+        except Exception as e:
+            print(f"[migration] alter type userrole/expensestatus: {e}")
+
     # Atualiza despesas com status 'aprovado' para 'aguardando_finalizacao'
     try:
         with engine.begin() as conn:
@@ -133,14 +142,7 @@ def run_auto_migrations():
         except Exception as e:
             print(f"[migration] {table}.{column}: {e}")
 
-    # Migrações adicionais de tipo e constraints no Postgres
     if not IS_SQLITE:
-        try:
-            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-                conn.execute(text("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'financeiro';"))
-        except Exception as e:
-            print(f"[migration] alter type userrole: {e}")
-
         try:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE users ALTER COLUMN payment_method TYPE VARCHAR(50);"))

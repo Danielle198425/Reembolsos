@@ -74,19 +74,31 @@ def get_summary(
             models.Expense.status == models.ExpenseStatus.aguardando_aprovacao
         ).count()
     elif scope in ["all", "financial", "financeiro"] and is_admin_fin:
-        # Escopo geral financeiro: visão completa de todas as despesas da empresa
-        pending_tasks = base.filter(
-            or_(
+        # Escopo geral financeiro: alçada de cada perfil
+        if current_user.role == models.UserRole.financeiro:
+            # Perfil Financeiro: apenas o que depende de sua alçada/ação para finalizar
+            # ("Aguardando Finalização do Financeiro" e compatibilidade com 'aprovado')
+            pending_tasks = base.filter(
                 models.Expense.status.in_([
-                    models.ExpenseStatus.aguardando_aprovacao,
-                    models.ExpenseStatus.aguardando_finalizacao
-                ]),
-                and_(
-                    models.Expense.status == models.ExpenseStatus.finalizado,
-                    or_(models.Expense.sienge_title == None, models.Expense.sienge_title == '')
+                    models.ExpenseStatus.aguardando_finalizacao,
+                    models.ExpenseStatus.aprovado
+                ])
+            ).count()
+        else:
+            # Perfil Administrador: visão de todas as pendências da empresa
+            pending_tasks = base.filter(
+                or_(
+                    models.Expense.status.in_([
+                        models.ExpenseStatus.aguardando_aprovacao,
+                        models.ExpenseStatus.aguardando_finalizacao,
+                        models.ExpenseStatus.aprovado
+                    ]),
+                    and_(
+                        models.Expense.status == models.ExpenseStatus.finalizado,
+                        or_(models.Expense.sienge_title == None, models.Expense.sienge_title == '')
+                    )
                 )
-            )
-        ).count()
+            ).count()
     else:
         # Escopo pessoal: despesas rejeitadas que precisam de correção pelo próprio usuário
         scope = "personal"

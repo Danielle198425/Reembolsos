@@ -480,7 +480,7 @@ const DashboardPage = {
 
     el.innerHTML = `
       <div onclick="localStorage.setItem('ml_filter_expenses_tab', 'pending'); if (typeof ExpensesPage !== 'undefined') ExpensesPage.currentTab = 'pending'; navigate('expenses');"
-           title="Clique para ver e aprovar as despesas pendentes"
+           title="Clique para revisar ou finalizar imediatamente"
            style="cursor:pointer;background:linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);border:1.5px solid #f59e0b;border-radius:12px;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-shadow:0 2px 8px rgba(245,158,11,0.12);transition:all .2s ease;"
            onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 20px rgba(245,158,11,0.25)';"
            onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(245,158,11,0.12)';">
@@ -493,7 +493,7 @@ const DashboardPage = {
               ${data.pending_tasks === 1 ? '1 despesa aguarda sua ação!' : `${data.pending_tasks} despesas aguardam sua ação!`}
             </div>
             <div style="font-size:13px;color:#b45309;line-height:1.4;">
-              Clique aqui para revisar e aprovar ou finalizar imediatamente.
+              Clique aqui para revisar ou finalizar imediatamente.
             </div>
           </div>
         </div>

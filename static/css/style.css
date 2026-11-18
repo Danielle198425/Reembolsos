@@ -1846,8 +1846,21 @@ tbody td {
     border-top: 1px solid var(--border, #E2E8F0) !important;
   }
   #expenses-table tr.expense-row .col-actions .td-actions {
+    display: flex !important;
+    align-items: center !important;
     justify-content: flex-end !important;
     gap: 10px !important;
+  }
+  #expenses-table tr.expense-row .col-actions .mobile-alerts-badge {
+    display: inline-flex !important;
+    margin-right: auto !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 4px 8px !important;
+    background: #fef2f2 !important;
+    border: 1.5px solid #fca5a5 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(239, 68, 68, 0.12) !important;
   }
   #expenses-table tr.expense-row .col-actions .action-btn {
     width: 36px !important;
@@ -2496,7 +2509,8 @@ tbody td {
   }
   .show-on-mobile,
   button.show-on-mobile,
-  .show-on-mobile-inline {
+  .show-on-mobile-inline,
+  .mobile-alerts-badge {
     display: none !important;
   }
 }

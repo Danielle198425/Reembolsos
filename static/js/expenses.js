@@ -591,15 +591,36 @@ const ExpensesPage = {
       }
 
       if (this.currentTab === 'pending') {
-        if (isAdminOrFinance) {
+        const userRole = App.user?.role;
+        if (userRole === 'financeiro') {
+          // Financeiro apenas "Aguardando Finalização do Financeiro" e "Finalizado pelo Financeiro"
+          if (scope === 'personal') {
+            expenses = expenses.filter(e => e.status === 'rejeitado');
+          } else {
+            expenses = expenses.filter(e => 
+              e.status === 'aguardando_finalizacao' || 
+              e.status === 'aprovado' || 
+              e.status === 'finalizado'
+            );
+          }
+        } else if (userRole === 'aprovador') {
+          // Aprovadores apenas "Aguardando Aprovação" ou "Rejeitado"
+          expenses = expenses.filter(e => 
+            e.status === 'aguardando_aprovacao' || 
+            e.status === 'rejeitado'
+          );
+        } else if (userRole === 'admin') {
+          // Administrador: visão completa de todas as pendências
           expenses = expenses.filter(e => 
             e.status === 'aguardando_aprovacao' || 
             e.status === 'aguardando_finalizacao' || 
-            (e.status === 'finalizado' && !e.sienge_title) || 
+            e.status === 'aprovado' || 
+            e.status === 'finalizado' || 
             e.status === 'rejeitado'
           );
         } else {
-          expenses = expenses.filter(e => e.status === 'aguardando_aprovacao' || e.status === 'aguardando_finalizacao' || e.status === 'aprovado' || e.status === 'rejeitado');
+          // Usuário comum (não aprovador, não adm, não financeiro): apenas despesas rejeitadas
+          expenses = expenses.filter(e => e.status === 'rejeitado');
         }
       }
 
@@ -970,11 +991,11 @@ const ExpensesPage = {
         <td class="col-actions">
           <div class="td-actions">
             ${(auditBadge || alertBadge || impAlertBadge) ? `
-              <div class="mobile-alerts-badge show-on-mobile-inline" style="margin-right:auto;display:none;align-items:center;gap:5px;padding:4px 9px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:8px;cursor:pointer;" onclick="ExpensesPage.viewExpense(${e.id})" title="${escHtml(auditTooltip || alertTooltip || impAlertTooltip)}">
+              <div class="mobile-alerts-badge" onclick="ExpensesPage.viewExpense(${e.id})" style="margin-right:auto;display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;box-shadow:0 1px 3px rgba(239,68,68,0.12);cursor:pointer;" title="${escHtml(auditTooltip || alertTooltip || impAlertTooltip)}">
                 ${auditBadge}
                 ${alertBadge}
                 ${impAlertBadge}
-                <span style="font-size:11.5px;font-weight:700;color:#dc2626;letter-spacing:0.02em;">Alerta</span>
+                <span style="font-size:11px;font-weight:800;color:#dc2626;letter-spacing:0.02em;">Alerta</span>
               </div>
             ` : ''}
             <button class="action-btn" title="Ver detalhes" data-action="view" data-id="${e.id}">👁</button>
@@ -1161,7 +1182,7 @@ const ExpensesPage = {
   async viewExpense(id) {
     try {
       const e = await Api.getExpense(id);
-      const flowStatuses = ['aguardando_aprovacao','aprovado','aguardando_finalizacao','finalizado','enviado','pago'];
+      const flowStatuses = ['aguardando_aprovacao','aguardando_finalizacao','finalizado','enviado','pago'];
       let normStatus = e.status === 'rejeitado' ? 'aguardando_aprovacao' : e.status;
       if (normStatus === 'rascunho' || normStatus === 'a_enviar') normStatus = 'aguardando_aprovacao';
       if (normStatus === 'aprovado') normStatus = 'aguardando_finalizacao';

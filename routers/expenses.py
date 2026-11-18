@@ -287,25 +287,37 @@ def list_expenses(
         q = q.filter(models.Expense.user_id == user_id)
 
     if pending_only:
-        if current_user.role in [models.UserRole.admin, models.UserRole.financeiro]:
-            q = q.filter(or_(
-                models.Expense.status.in_([
-                    models.ExpenseStatus.aguardando_aprovacao,
+        if current_user.role == models.UserRole.financeiro:
+            # Perfil Financeiro: apenas o que é da sua alçada ("Aguardando Finalização do Financeiro" e "Finalizado pelo Financeiro")
+            if scope == "personal":
+                q = q.filter(models.Expense.user_id == current_user.id, models.Expense.status == models.ExpenseStatus.rejeitado)
+            else:
+                q = q.filter(models.Expense.status.in_([
                     models.ExpenseStatus.aguardando_finalizacao,
-                    models.ExpenseStatus.rejeitado,
-                ]),
-                and_(
-                    models.Expense.status == models.ExpenseStatus.finalizado,
-                    or_(models.Expense.sienge_title == None, models.Expense.sienge_title == '')
-                )
-            ))
-        else:
+                    models.ExpenseStatus.aprovado,
+                    models.ExpenseStatus.finalizado,
+                ]))
+        elif current_user.role == models.UserRole.aprovador:
+            # Aprovadores apenas "Aguardando Aprovação" ou "Rejeitado"
+            q = q.filter(models.Expense.status.in_([
+                models.ExpenseStatus.aguardando_aprovacao,
+                models.ExpenseStatus.rejeitado,
+            ]))
+        elif current_user.role == models.UserRole.admin:
+            # Administrador: visão completa de todas as pendências
             q = q.filter(models.Expense.status.in_([
                 models.ExpenseStatus.aguardando_aprovacao,
                 models.ExpenseStatus.aguardando_finalizacao,
                 models.ExpenseStatus.aprovado,
+                models.ExpenseStatus.finalizado,
                 models.ExpenseStatus.rejeitado,
             ]))
+        else:
+            # Usuário comum (não aprovador, não adm, não financeiro): somente se tiver despesa rejeitada
+            q = q.filter(
+                models.Expense.user_id == current_user.id,
+                models.Expense.status == models.ExpenseStatus.rejeitado
+            )
     elif status_filter:
         statuses = status_filter.split(",")
         q = q.filter(models.Expense.status.in_(statuses))
