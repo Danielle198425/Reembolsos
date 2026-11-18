@@ -369,6 +369,10 @@ function showApp(user) {
     initialPage = 'dashboard';
   }
   navigate(initialPage, false);
+
+  if (window.PushManager && PushManager.updateButtonsState) {
+    PushManager.updateButtonsState();
+  }
 }
 
 async function exitImpersonation() {

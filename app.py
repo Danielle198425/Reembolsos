@@ -9,7 +9,7 @@ from sqlalchemy import inspect, text
 from database import engine, Base, SessionLocal, IS_SQLITE
 import models
 import storage
-from routers import auth, dashboard, expenses, exports, admin, sienge, users, maps
+from routers import auth, dashboard, expenses, exports, admin, sienge, users, maps, push, cron
 from seed import run_seed
 
 # Tipos compatíveis entre SQLite e Postgres
@@ -108,6 +108,40 @@ def run_auto_migrations():
                 """))
     except Exception as e:
         print(f"[migration] user_saved_addresses table init: {e}")
+
+    # Criação explícita da tabela push_subscriptions se necessário
+    try:
+        with engine.begin() as conn:
+            if IS_SQLITE:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS push_subscriptions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        endpoint TEXT NOT NULL UNIQUE,
+                        p256dh TEXT NOT NULL,
+                        auth TEXT NOT NULL,
+                        user_agent VARCHAR(500),
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                """))
+            else:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS push_subscriptions (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        endpoint TEXT NOT NULL UNIQUE,
+                        p256dh TEXT NOT NULL,
+                        auth TEXT NOT NULL,
+                        user_agent VARCHAR(500),
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_push_subscriptions_user_id ON push_subscriptions(user_id);
+                    CREATE INDEX IF NOT EXISTS ix_push_subscriptions_endpoint ON push_subscriptions(endpoint);
+                """))
+    except Exception as e:
+        print(f"[migration] push_subscriptions table init: {e}")
 
     # Migrações adicionais de tipo e constraints no Postgres
     if not IS_SQLITE:
@@ -338,6 +372,8 @@ app.include_router(admin.router)
 app.include_router(sienge.router)
 app.include_router(users.router)
 app.include_router(maps.router)
+app.include_router(push.router)
+app.include_router(cron.router)
 
 # Static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

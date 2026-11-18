@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/style.css?v=93" />
+  <link rel="stylesheet" href="/static/css/style.css?v=94" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
@@ -89,6 +89,12 @@
         <span class="nav-label">Administração</span>
       </a>
     </nav>
+
+    <div style="padding: 0 12px 10px 12px;">
+      <button class="btn btn-sm btn-ghost push-notification-btn" id="btn-sidebar-push" onclick="PushManager.toggleSubscription()" style="width:100%;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px;background:var(--surface);">
+        🔔 Ativar Notificações
+      </button>
+    </div>
 
     <div class="sidebar-footer">
       <div class="user-info">
@@ -168,12 +174,13 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="/static/js/api.js?v=93"></script>
-<script src="/static/js/dashboard.js?v=93"></script>
-<script src="/static/js/expenses.js?v=93"></script>
-<script src="/static/js/exports.js?v=93"></script>
-<script src="/static/js/payment_calendar.js?v=93"></script>
-<script src="/static/js/admin.js?v=93"></script>
-<script src="/static/js/app.js?v=93"></script>
+<script src="/static/js/api.js?v=94"></script>
+<script src="/static/js/push_manager.js?v=94"></script>
+<script src="/static/js/dashboard.js?v=94"></script>
+<script src="/static/js/expenses.js?v=94"></script>
+<script src="/static/js/exports.js?v=94"></script>
+<script src="/static/js/payment_calendar.js?v=94"></script>
+<script src="/static/js/admin.js?v=94"></script>
+<script src="/static/js/app.js?v=94"></script>
 </body>
 </html>

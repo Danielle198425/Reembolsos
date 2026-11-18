@@ -15,4 +15,5 @@ pypdf>=6.0.0
 requests>=2.31.0
 azure-ai-formrecognizer>=3.3.3
 azure-identity>=1.16.1
+pywebpush>=1.14.0
 

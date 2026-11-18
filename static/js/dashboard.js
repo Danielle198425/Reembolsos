@@ -340,10 +340,23 @@ const DashboardPage = {
         }).join('');
 
     Modal.open('🔔 Notificações', `
+      <div style="margin:-4px -4px 12px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">📲</span>
+          <span style="font-size:13px;color:var(--text-1);font-weight:600;">Alertas no navegador e celular</span>
+        </div>
+        <button class="btn btn-sm btn-ghost push-notification-btn" onclick="PushManager.toggleSubscription()" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);">
+          🔔 Ativar Notificações
+        </button>
+      </div>
       <div style="max-height:420px;overflow-y:auto;margin:-8px -8px -16px;">
         ${body}
       </div>
     `, `<button class="btn btn-secondary" onclick="Modal.close()">Fechar</button>`);
+
+    if (window.PushManager && PushManager.updateButtonsState) {
+      PushManager.updateButtonsState();
+    }
 
     const badge = document.getElementById('dash-notif-badge');
     if (badge) badge.classList.add('hidden');

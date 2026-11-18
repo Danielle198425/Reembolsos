@@ -280,4 +280,15 @@ const Api = {
   mapsRoute(data) {
     return Api.post('/api/maps/route', data);
   },
+
+  // ── Web Push Notifications ────────────────────────────────────────────────
+  getVapidPublicKey() {
+    return Api.get('/api/push/vapid-public-key');
+  },
+  subscribePush(subData) {
+    return Api.post('/api/push/subscribe', subData);
+  },
+  unsubscribePush(endpoint) {
+    return Api.delete('/api/push/unsubscribe', { endpoint });
+  },
 };

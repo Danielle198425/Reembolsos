@@ -6,7 +6,7 @@ from datetime import date, datetime
 from urllib.parse import unquote
 from fastapi import (
     APIRouter, Depends, HTTPException, status,
-    UploadFile, File, Query, Request
+    UploadFile, File, Query, Request, BackgroundTasks
 )
 from fastapi.responses import FileResponse
 from sqlalchemy import or_, and_, func
@@ -639,7 +639,31 @@ def delete_expense(
     db.commit()
 
 
-def _transition(expense_id: int, action: str, current_user: models.User, db: Session, reason: str = None, request: Request = None):
+def _send_rejection_push_bg(user_id: int, expense_id: int, provider_desc: str, amount: float):
+    """Envia notificação push para o colaborador quando a despesa é rejeitada (Gatilho 1)."""
+    try:
+        from database import SessionLocal
+        from services.push_notifications import send_user_push
+        db_bg = SessionLocal()
+        try:
+            title = "Reembolso Rejeitado — Moura Leite"
+            message = f"Sua despesa #{expense_id} ({provider_desc} - R$ {amount:.2f}) foi rejeitada. Acesse o sistema para verificar o motivo."
+            send_user_push(db=db_bg, user_id=user_id, title=title, message=message, url="/#expenses")
+        finally:
+            db_bg.close()
+    except Exception as e:
+        logger.error(f"[Push] Erro ao disparar push de rejeição em background: {e}")
+
+
+def _transition(
+    expense_id: int,
+    action: str,
+    current_user: models.User,
+    db: Session,
+    reason: str = None,
+    request: Request = None,
+    background_tasks: Optional[BackgroundTasks] = None
+):
     expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(404, "Despesa não encontrada")
@@ -778,6 +802,27 @@ def _transition(expense_id: int, action: str, current_user: models.User, db: Ses
         except Exception as exc:
             print(f"Erro ao disparar e-mail de rejeição: {exc}")
 
+        # Disparar notificação push imediata para o colaborador dono da despesa (Gatilho 1)
+        try:
+            prov_desc = expense.provider or expense.description
+            if background_tasks:
+                background_tasks.add_task(
+                    _send_rejection_push_bg,
+                    user_id=expense.user_id,
+                    expense_id=expense.id,
+                    provider_desc=prov_desc,
+                    amount=expense.amount
+                )
+            else:
+                _send_rejection_push_bg(
+                    user_id=expense.user_id,
+                    expense_id=expense.id,
+                    provider_desc=prov_desc,
+                    amount=expense.amount
+                )
+        except Exception as push_err:
+            logger.error(f"[Push] Falha ao agendar push de rejeição: {push_err}")
+
     if action == "resubmit":
         expense.is_corrected = True
         if imp_id and imp_name:
@@ -841,10 +886,11 @@ def reject_expense(
     expense_id: int,
     body: schemas.RejectRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     current_user=Depends(auth.require_approver),
     db=Depends(get_db)
 ):
-    return _transition(expense_id, "reject", current_user, db, reason=body.reason, request=request)
+    return _transition(expense_id, "reject", current_user, db, reason=body.reason, request=request, background_tasks=background_tasks)
 
 
 @router.post("/{expense_id}/finalize")

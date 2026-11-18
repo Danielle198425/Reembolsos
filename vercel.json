@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/friday-pending-approvals",
+      "schedule": "0 12 * * 5"
+    }
+  ],
   "headers": [
     {
       "source": "/sw.js",
@@ -16,6 +22,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/cron/(.*)",
+      "destination": "/api/index.py?__path=api/cron/$1"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api/index.py?__path=api/$1"
