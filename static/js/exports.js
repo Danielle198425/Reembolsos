@@ -18,6 +18,7 @@ const ExportsPage = {
   },
 
   async render() {
+    const isMobile = window.innerWidth <= 768;
     const isApproverOrAdmin = ['admin', 'financeiro', 'aprovador'].includes(App.user?.role);
     const isAdminOrFinance = App.user?.role === 'admin' || App.user?.role === 'financeiro';
     const teamScopeName = App.user?.role === 'aprovador' ? 'team' : 'financial';
@@ -30,7 +31,7 @@ const ExportsPage = {
       this._currentScope = isAdminOrFinance ? 'financial' : (App.user?.role === 'aprovador' ? 'team' : 'personal');
     }
 
-    const colSpan = 5;
+    const colSpan = (isAdminOrFinance && !isMobile) ? 7 : 5;
 
     const el = document.getElementById('page-exports');
     el.innerHTML = `
@@ -44,22 +45,38 @@ const ExportsPage = {
 
       <div class="page-header">
         <div>
-          <h1 class="page-title">Relatórios</h1>
-          <p class="page-subtitle">Consulta de relatórios gerados em PDF</p>
+          <h1 class="page-title">${isMobile ? 'Relatórios' : 'Exportações'}</h1>
+          <p class="page-subtitle">${isMobile ? 'Consulta de relatórios gerados em PDF' : 'Relatórios gerados em PDF'}</p>
         </div>
+        ${(isAdminOrFinance && !isMobile) ? `
+        <div class="exports-header-actions">
+          <button class="btn btn-primary" id="btn-new-export">⬇ Executar Relatório</button>
+        </div>` : ''}
       </div>
 
       <div id="exports-content">
         <div class="table-wrapper">
           <div class="filters-bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            ${!isMobile ? `
             <div class="search-wrapper" style="flex:1;min-width:220px;">
               <span class="search-icon">🔍</span>
-              <input type="text" class="search-input" id="export-search" placeholder="Buscar relatório por nome ou tipo..." />
+              <input type="text" class="search-input" id="export-search" placeholder="Buscar relatório..." />
             </div>
-            <select class="filter-select" id="select-report-filter" style="max-width:340px;">
-              <option value="">Todos os relatórios (exibindo o mais recente)</option>
+            ${isAdminOrFinance ? `
+            <button class="btn btn-sm btn-primary" id="btn-bulk-email-export" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:7px 14px;font-size:13px;border-radius:8px;background:var(--ml-indigo);border-color:var(--ml-indigo);color:white;cursor:pointer;">
+              📧 Enviar e-mail em massa
+            </button>` : ''}
+            ` : ''}
+            <select class="filter-select" id="select-report-filter" style="${isMobile ? 'width:100%;max-width:100%;font-size:14px;padding:9px 12px;' : 'max-width:340px;'}">
+              <option value="">${isMobile ? 'Todos os relatórios (exibindo o mais recente)' : 'Todos os relatórios...'}</option>
             </select>
-            <button class="btn btn-sm btn-ghost" id="clear-export-filter-btn">✕ Limpar</button>
+            ${!isMobile ? `
+            <select class="filter-select" id="select-email-status-filter">
+              <option value="">Todos os status...</option>
+              <option value="a_enviar">A enviar</option>
+              <option value="enviados">Já enviados</option>
+            </select>` : ''}
+            <button class="btn btn-sm btn-ghost" id="clear-export-filter-btn" style="${isMobile ? 'margin-left:auto;' : ''}">✕ Limpar</button>
           </div>
           <div class="table-header">
             <span class="table-count" id="exports-count">Carregando...</span>
@@ -68,11 +85,13 @@ const ExportsPage = {
             <table>
               <thead>
                 <tr>
+                  ${(isAdminOrFinance && !isMobile) ? `<th><input type="checkbox" id="select-all-exp-exp" /></th>` : ''}
                   <th>Nome do Relatório</th>
                   <th>Gerado Por</th>
                   <th>Tipo</th>
                   <th>Data</th>
                   <th>Baixar PDF</th>
+                  ${(isAdminOrFinance && !isMobile) ? `<th>Ações</th>` : ''}
                 </tr>
               </thead>
               <tbody id="exports-tbody">
@@ -89,14 +108,23 @@ const ExportsPage = {
     `;
 
     // Events
+    document.getElementById('btn-new-export')?.addEventListener('click', () => this.openExportModal());
+    document.getElementById('btn-bulk-email-export')?.addEventListener('click', () => this.bulkSendEmails());
     document.getElementById('select-report-filter')?.addEventListener('change', () => this._filterAndRenderExports());
+    document.getElementById('select-email-status-filter')?.addEventListener('change', () => this._filterAndRenderExports());
     document.getElementById('export-search')?.addEventListener('input', () => this._filterAndRenderExports());
     document.getElementById('clear-export-filter-btn')?.addEventListener('click', () => {
       const sel = document.getElementById('select-report-filter');
+      const emailSel = document.getElementById('select-email-status-filter');
       const search = document.getElementById('export-search');
       if (sel) sel.value = '';
+      if (emailSel) emailSel.value = '';
       if (search) search.value = '';
       this._filterAndRenderExports();
+    });
+
+    document.getElementById('select-all-exp-exp')?.addEventListener('change', (e) => {
+      document.querySelectorAll('#exports-tbody input[type="checkbox"]').forEach(cb => cb.checked = e.target.checked);
     });
 
     // Check if came from expense selection
@@ -114,9 +142,11 @@ const ExportsPage = {
   },
 
   async loadExports() {
+    const isMobile = window.innerWidth <= 768;
     const isApproverOrAdmin = ['admin', 'financeiro', 'aprovador'].includes(App.user?.role);
+    const isAdminOrFinance = App.user?.role === 'admin' || App.user?.role === 'financeiro';
     const scope = isApproverOrAdmin ? (this._currentScope || localStorage.getItem('active_scope') || 'personal') : 'personal';
-    const colSpan = 5;
+    const colSpan = (isAdminOrFinance && !isMobile) ? 7 : 5;
     const tbody = document.getElementById('exports-tbody');
     if (!tbody) return;
     try {
@@ -127,7 +157,8 @@ const ExportsPage = {
       const sel = document.getElementById('select-report-filter');
       if (sel) {
         const curVal = sel.value;
-        sel.innerHTML = '<option value="">Todos os relatórios (exibindo o mais recente)</option>';
+        const defaultOptionText = isMobile ? 'Todos os relatórios (exibindo o mais recente)' : 'Todos os relatórios...';
+        sel.innerHTML = `<option value="">${defaultOptionText}</option>`;
         this._allExports.forEach(ex => {
           const dateStr = fmtDate(ex.created_at);
           sel.innerHTML += `<option value="${ex.id}">${escHtml(ex.name)} (${dateStr})</option>`;
@@ -144,18 +175,27 @@ const ExportsPage = {
   },
 
   _filterAndRenderExports() {
-    const colSpan = 5;
+    const isMobile = window.innerWidth <= 768;
+    const isAdminOrFinance = App.user?.role === 'admin' || App.user?.role === 'financeiro';
+    const showAdminColumns = isAdminOrFinance && !isMobile;
+    const colSpan = showAdminColumns ? 7 : 5;
     const tbody = document.getElementById('exports-tbody');
     if (!tbody) return;
 
     let allItems = this._allExports || [];
     const selectedId = document.getElementById('select-report-filter')?.value;
+    const emailStatus = document.getElementById('select-email-status-filter')?.value;
     const search = document.getElementById('export-search')?.value.trim().toLowerCase();
-    const isFiltered = Boolean(selectedId || search);
+    const isFiltered = Boolean(selectedId || search || (emailStatus && !isMobile));
 
     let items = allItems;
     if (selectedId) {
       items = items.filter(ex => String(ex.id) === String(selectedId));
+    }
+    if (emailStatus === 'a_enviar' && !isMobile) {
+      items = items.filter(ex => !ex.email_sent);
+    } else if (emailStatus === 'enviados' && !isMobile) {
+      items = items.filter(ex => Boolean(ex.email_sent));
     }
     if (search) {
       items = items.filter(ex =>
@@ -167,14 +207,14 @@ const ExportsPage = {
 
     const allCount = allItems.length;
 
-    // Se o filtro estiver sem seleção, exibe apenas o último relatório emitido/enviado
-    if (!isFiltered && items.length > 0) {
+    // Apenas no APP mobile: se o filtro estiver sem seleção, exibe apenas o último relatório emitido/enviado
+    if (isMobile && !isFiltered && items.length > 0) {
       items = [items[0]];
     }
 
     const countEl = document.getElementById('exports-count');
     if (countEl) {
-      if (!isFiltered && allCount > 1) {
+      if (isMobile && !isFiltered && allCount > 1) {
         countEl.innerHTML = `Exibindo o último relatório emitido (<strong>1</strong> de <strong>${allCount}</strong>). Selecione no filtro para consultar os anteriores.`;
       } else {
         countEl.innerHTML = `<strong>${items.length}</strong> relatório(s)`;
@@ -190,6 +230,7 @@ const ExportsPage = {
 
     tbody.innerHTML = items.map(ex => `
       <tr class="export-row" data-id="${ex.id}">
+        ${showAdminColumns ? `<td class="col-exp-check"><input type="checkbox" value="${ex.id}" /></td>` : ''}
         <td class="col-exp-name">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:20px;">📄</span>
@@ -216,6 +257,17 @@ const ExportsPage = {
             📄 Baixar PDF
           </a>
         </td>
+        ${showAdminColumns ? `
+        <td class="col-exp-actions">
+          ${ex.email_sent ? `
+            <button class="btn-icon text-success" title="Relatório enviado" style="margin-right:6px;font-size:16px;cursor:pointer;background:none;border:none;color:#10b981;font-weight:bold;" onclick="ExportsPage.sendReportEmail(${ex.id})">📧<span style="font-size:10px;vertical-align:top;margin-left:1px;color:#10b981;font-weight:bold;">✓</span></button>
+          ` : `
+            <button class="btn-icon text-indigo" title="Enviar relatório por e-mail" style="margin-right:6px;font-size:15px;cursor:pointer;background:none;border:none;opacity:0.7;" onclick="ExportsPage.sendReportEmail(${ex.id})">📧</button>
+          `}
+          ${App.user?.role === 'admin' ? `
+            <button class="action-btn danger" title="Excluir" onclick="ExportsPage.deleteExport(${ex.id})">🗑</button>
+          ` : ''}
+        </td>` : ''}
       </tr>
     `).join('');
   },

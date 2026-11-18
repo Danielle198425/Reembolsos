@@ -262,6 +262,12 @@ function navigate(page, updateHistory = true) {
 
   document.querySelectorAll('.mobile-nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.page === page);
+    if (el.dataset.page === 'exports') {
+      const lbl = el.querySelector('.mobile-nav-label');
+      if (lbl) lbl.textContent = 'Relatórios';
+      const icn = el.querySelector('.mobile-nav-icon');
+      if (icn) icn.textContent = '📊';
+    }
   });
 
   const activePageEl = document.getElementById(`page-${page}`);

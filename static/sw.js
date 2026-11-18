@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ml-reembolsos-v9';
+const CACHE_NAME = 'ml-reembolsos-v10';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
