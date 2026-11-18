@@ -293,12 +293,42 @@ const DashboardPage = {
   },
 
   async _onNotificacoes() {
+    // 1. Abre o modal IMEDIATAMENTE para dar feedback instantâneo ao clique do usuário
+    Modal.open('🔔 Notificações', `
+      <div style="margin:-4px -4px 12px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">📲</span>
+          <span style="font-size:13px;color:var(--text-1);font-weight:600;">Alertas no navegador e celular</span>
+        </div>
+        <button class="btn btn-sm btn-ghost push-notification-btn" onclick="window.togglePushNotifications ? window.togglePushNotifications(this) : (window.WebPush && WebPush.toggleSubscription(this))" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;">
+          🔔 Ativar Notificações
+        </button>
+      </div>
+      <div id="modal-notifs-content" style="max-height:420px;overflow-y:auto;margin:-8px -8px -16px;min-height:120px;display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;padding:30px;color:var(--text-3);font-size:14px;">
+          <div style="font-size:28px;margin-bottom:8px;animation:spin 1s linear infinite;display:inline-block;">⌛</div>
+          <div>Carregando notificações...</div>
+        </div>
+      </div>
+    `, `<button class="btn btn-secondary" onclick="Modal.close()">Fechar</button>`);
+
+    if (window.WebPush && WebPush.updateButtonsState) {
+      WebPush.updateButtonsState();
+    }
+
+    const badge = document.getElementById('dash-notif-badge');
+    if (badge) badge.classList.add('hidden');
+
+    // 2. Carrega as notificações em background e renderiza
     let notifs = [];
     try {
       notifs = await Api.getNotifications();
     } catch(e) {
       console.warn('Erro ao carregar notificações:', e);
     }
+
+    const container = document.getElementById('modal-notifs-content');
+    if (!container) return;
 
     const statusIcons = {
       aprovado: '✅',
@@ -316,50 +346,33 @@ const DashboardPage = {
       aguardando_aprovacao: '#7c3aed',
     };
 
-    const body = (!notifs || notifs.length === 0)
-      ? `<div style="text-align:center;padding:40px;color:var(--text-4);">
-           <div style="font-size:48px;margin-bottom:12px;">🔔</div>
-           <p style="font-size:15px;">Nenhuma notificação no momento.</p>
-         </div>`
-      : notifs.map(n => {
-          const icon = statusIcons[n.status] || '📋';
-          const color = statusColors[n.status] || '#64748b';
-          const dateStr = n.date || '';
-          const expId = n.expense_id || n.id;
-          return `
-            <div onclick="Modal.close(); navigate('expenses'); ${expId ? `setTimeout(() => { if (typeof ExpensesPage !== 'undefined' && ExpensesPage.viewExpense) ExpensesPage.viewExpense(${expId}); }, 250);` : ''}"
-                 style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;"
-                 onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
-              <div style="font-size:26px;line-height:1;flex-shrink:0;">${icon}</div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-weight:700;font-size:14px;color:${color};margin-bottom:4px;">${escHtml(n.title)}</div>
-                <div style="font-size:13px;color:var(--text-2);line-height:1.4;margin-bottom:4px;word-break:break-word;">${escHtml(n.message)}</div>
-                <div style="font-size:11px;color:var(--text-4);">${escHtml(dateStr)}</div>
-              </div>
-            </div>`;
-        }).join('');
-
-    Modal.open('🔔 Notificações', `
-      <div style="margin:-4px -4px 12px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:18px;">📲</span>
-          <span style="font-size:13px;color:var(--text-1);font-weight:600;">Alertas no navegador e celular</span>
-        </div>
-        <button class="btn btn-sm btn-ghost push-notification-btn" onclick="window.PushManager ? PushManager.toggleSubscription(this) : null" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);">
-          🔔 Ativar Notificações
-        </button>
-      </div>
-      <div style="max-height:420px;overflow-y:auto;margin:-8px -8px -16px;">
-        ${body}
-      </div>
-    `, `<button class="btn btn-secondary" onclick="Modal.close()">Fechar</button>`);
-
-    if (window.PushManager && PushManager.updateButtonsState) {
-      PushManager.updateButtonsState();
+    if (!notifs || notifs.length === 0) {
+      container.style.display = 'block';
+      container.innerHTML = `
+        <div style="text-align:center;padding:40px;color:var(--text-4);">
+          <div style="font-size:48px;margin-bottom:12px;">🔔</div>
+          <p style="font-size:15px;">Nenhuma notificação no momento.</p>
+        </div>`;
+    } else {
+      container.style.display = 'block';
+      container.innerHTML = notifs.map(n => {
+        const icon = statusIcons[n.status] || '📋';
+        const color = statusColors[n.status] || '#64748b';
+        const dateStr = n.date || '';
+        const expId = n.expense_id || n.id;
+        return `
+          <div onclick="Modal.close(); navigate('expenses'); ${expId ? `setTimeout(() => { if (typeof ExpensesPage !== 'undefined' && ExpensesPage.viewExpense) ExpensesPage.viewExpense(${expId}); }, 250);` : ''}"
+               style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;"
+               onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+            <div style="font-size:26px;line-height:1;flex-shrink:0;">${icon}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;font-size:14px;color:${color};margin-bottom:4px;">${escHtml(n.title)}</div>
+              <div style="font-size:13px;color:var(--text-2);line-height:1.4;margin-bottom:4px;word-break:break-word;">${escHtml(n.message)}</div>
+              <div style="font-size:11px;color:var(--text-4);">${escHtml(dateStr)}</div>
+            </div>
+          </div>`;
+      }).join('');
     }
-
-    const badge = document.getElementById('dash-notif-badge');
-    if (badge) badge.classList.add('hidden');
   },
 
   async _onPoliticas() {

@@ -91,7 +91,7 @@
     </nav>
 
     <div style="padding: 0 12px 10px 12px;">
-      <button class="btn btn-sm btn-ghost push-notification-btn" id="btn-sidebar-push" onclick="window.PushManager ? PushManager.toggleSubscription(this) : null" style="width:100%;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px;background:var(--surface);">
+      <button class="btn btn-sm btn-ghost push-notification-btn" id="btn-sidebar-push" onclick="window.togglePushNotifications ? window.togglePushNotifications(this) : (window.WebPush && WebPush.toggleSubscription(this))" style="width:100%;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px;background:var(--surface);cursor:pointer;">
         🔔 Ativar Notificações
       </button>
     </div>
@@ -174,13 +174,13 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="/static/js/api.js?v=95"></script>
-<script src="/static/js/push_manager.js?v=95"></script>
-<script src="/static/js/dashboard.js?v=95"></script>
-<script src="/static/js/expenses.js?v=95"></script>
-<script src="/static/js/exports.js?v=95"></script>
-<script src="/static/js/payment_calendar.js?v=95"></script>
-<script src="/static/js/admin.js?v=95"></script>
-<script src="/static/js/app.js?v=95"></script>
+<script src="/static/js/api.js?v=96"></script>
+<script src="/static/js/push_manager.js?v=96"></script>
+<script src="/static/js/dashboard.js?v=96"></script>
+<script src="/static/js/expenses.js?v=96"></script>
+<script src="/static/js/exports.js?v=96"></script>
+<script src="/static/js/payment_calendar.js?v=96"></script>
+<script src="/static/js/admin.js?v=96"></script>
+<script src="/static/js/app.js?v=96"></script>
 </body>
 </html>

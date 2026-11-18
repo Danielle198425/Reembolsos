@@ -370,8 +370,8 @@ function showApp(user) {
   }
   navigate(initialPage, false);
 
-  if (window.PushManager && PushManager.updateButtonsState) {
-    PushManager.updateButtonsState();
+  if (window.WebPush && WebPush.updateButtonsState) {
+    WebPush.updateButtonsState();
   }
 }
 
