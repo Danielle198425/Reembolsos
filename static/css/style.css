@@ -2302,6 +2302,38 @@ tbody td {
     display: block !important;
     width: 100% !important;
   }
+  #page-exports tbody tr.empty-state-row,
+  #page-exports tbody tr:not(.export-row) {
+    display: block !important;
+    width: 100% !important;
+    border: none !important;
+    background: transparent !important;
+  }
+  #page-exports tbody tr.empty-state-row td,
+  #page-exports tbody tr:not(.export-row) td {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+  #page-exports .empty-state {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+  }
+  #page-exports .empty-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100% !important;
+    margin: 0 auto 12px auto !important;
+  }
   #page-exports tbody tr.export-row {
     display: flex !important;
     flex-direction: column !important;

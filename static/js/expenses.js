@@ -124,6 +124,11 @@ const ExpensesPage = {
       tabPers.classList.toggle('active', scope === 'personal');
       tabTeam.classList.toggle('active', scope !== 'personal');
     }
+    const userSel = document.getElementById('filter-user');
+    if (userSel) {
+      userSel.style.display = (scope === 'personal') ? 'none' : '';
+      if (scope === 'personal') userSel.value = '';
+    }
     this.loadExpenses();
   },
 
@@ -444,6 +449,11 @@ const ExpensesPage = {
     } else {
       filtersEl.style.removeProperty('display');
     }
+    const userSel = document.getElementById('filter-user');
+    if (userSel) {
+      const isPersonal = (this._currentScope || localStorage.getItem('active_scope') || 'personal') === 'personal';
+      userSel.style.display = isPersonal ? 'none' : '';
+    }
     if (!this._resizeBound) {
       this._resizeBound = true;
       window.addEventListener('resize', () => {
@@ -558,7 +568,8 @@ const ExpensesPage = {
       this._updateTabFilterVisibility();
       const isApproverOrAdmin = ['admin', 'financeiro', 'aprovador'].includes(App.user?.role);
       const scope = isApproverOrAdmin ? (this._currentScope || localStorage.getItem('active_scope') || 'personal') : 'personal';
-      const userVal = document.getElementById('filter-user')?.value || '';
+      const isPersonal = scope === 'personal' || scope === 'pessoal';
+      const userVal = isPersonal ? '' : (document.getElementById('filter-user')?.value || '');
       const monthVal = document.getElementById('filter-month')?.value || '';
       let dateFrom = document.getElementById('filter-date-from')?.value || '';
       let dateTo = document.getElementById('filter-date-to')?.value || '';
@@ -586,23 +597,25 @@ const ExpensesPage = {
       let expenses = data.items || [];
       this.loadedExpenses = expenses;
 
-      if (userVal) {
+      if (!isPersonal && userVal) {
         expenses = expenses.filter(e => String(e.user_id) === String(userVal));
       }
 
       if (this.currentTab === 'pending') {
         const userRole = App.user?.role;
-        if (userRole === 'financeiro') {
+        if (isPersonal) {
+          expenses = expenses.filter(e => 
+            e.status === 'aguardando_aprovacao' || 
+            e.status === 'aguardando_finalizacao' || 
+            e.status === 'rejeitado'
+          );
+        } else if (userRole === 'financeiro') {
           // Financeiro apenas "Aguardando Finalização do Financeiro" e "Finalizado pelo Financeiro"
-          if (scope === 'personal') {
-            expenses = expenses.filter(e => e.status === 'rejeitado');
-          } else {
-            expenses = expenses.filter(e => 
-              e.status === 'aguardando_finalizacao' || 
-              e.status === 'aprovado' || 
-              e.status === 'finalizado'
-            );
-          }
+          expenses = expenses.filter(e => 
+            e.status === 'aguardando_finalizacao' || 
+            e.status === 'aprovado' || 
+            e.status === 'finalizado'
+          );
         } else if (userRole === 'aprovador') {
           // Aprovadores apenas "Aguardando Aprovação" ou "Rejeitado"
           expenses = expenses.filter(e => 
@@ -619,8 +632,12 @@ const ExpensesPage = {
             e.status === 'rejeitado'
           );
         } else {
-          // Usuário comum (não aprovador, não adm, não financeiro): apenas despesas rejeitadas
-          expenses = expenses.filter(e => e.status === 'rejeitado');
+          // Usuário comum: apenas despesas com pendência
+          expenses = expenses.filter(e => 
+            e.status === 'aguardando_aprovacao' || 
+            e.status === 'aguardando_finalizacao' || 
+            e.status === 'rejeitado'
+          );
         }
       }
 

@@ -222,9 +222,15 @@ const ExportsPage = {
     }
 
     if (items.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="${colSpan}"><div class="empty-state">
-        <span class="empty-icon">📄</span><p>Nenhum relatório encontrado</p>
-      </div></td></tr>`;
+      tbody.innerHTML = `
+        <tr class="empty-state-row" style="display:block;width:100% !important;border:none !important;background:transparent !important;">
+          <td colspan="${colSpan}" style="display:block;width:100% !important;padding:0 !important;border:none !important;background:transparent !important;">
+            <div class="empty-state" style="display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;text-align:center !important;width:100% !important;padding:48px 16px !important;margin:0 auto !important;box-sizing:border-box !important;">
+              <span class="empty-icon" style="font-size:48px !important;line-height:1 !important;margin:0 auto 12px auto !important;display:flex !important;align-items:center !important;justify-content:center !important;width:100% !important;text-align:center !important;">📄</span>
+              <p style="margin:0 auto !important;text-align:center !important;width:100% !important;font-size:15px !important;color:var(--text-4) !important;">Nenhum relatório encontrado</p>
+            </div>
+          </td>
+        </tr>`;
       return;
     }
 
