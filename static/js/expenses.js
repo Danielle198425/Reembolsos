@@ -1556,7 +1556,12 @@ const ExpensesPage = {
 
 
     const isFormImpersonated = Boolean(sessionStorage.getItem('ml_impersonator_token'));
-    const isNewReceiptExpense = !id && !opts.forceKm;
+    const isAppEnvironment = (() => {
+      const isMobileDevice = /Android|iPhone|iPad|iPod|Windows Phone|webOS|BlackBerry|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent || '');
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      return isMobileDevice || (isStandalone && window.innerWidth <= 1024 && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
+    })();
+    const isNewReceiptExpense = !id && !opts.forceKm && isAppEnvironment;
 
     const html = `
       <!-- ETAPA 1: Visor da Câmera com Auto-Capture Inteligente -->
@@ -1636,7 +1641,7 @@ const ExpensesPage = {
               </div>
               <div style="display:flex;align-items:center;gap:8px;">
                 <button type="button" id="btn-retake-photo" class="btn btn-sm btn-secondary" style="font-size:12px;padding:5px 10px;display:inline-flex;align-items:center;gap:4px;">
-                  🔄 Refazer Foto
+                  ${isAppEnvironment ? '🔄 Refazer Foto' : '🔄 Alterar Comprovante'}
                 </button>
                 <button type="button" id="btn-remove-receipt" class="btn btn-sm btn-ghost" style="color:var(--red);font-size:12px;padding:5px 8px;" title="Remover comprovante">✕ Remover</button>
               </div>
@@ -1973,6 +1978,10 @@ const ExpensesPage = {
     };
 
     const goToStep1 = () => {
+      if (!isAppEnvironment) {
+        document.getElementById('ef-receipt-gallery')?.click();
+        return;
+      }
       const step1 = document.getElementById('camera-step-wrap');
       const step2 = document.getElementById('expense-fields-step');
       const saveBtn = document.getElementById('save-submit-btn');
@@ -2188,6 +2197,10 @@ const ExpensesPage = {
 
     const startCameraWithAutoCapture = async () => {
       stopCameraAndLoop();
+      if (!isAppEnvironment) {
+        goToStep2();
+        return;
+      }
       window._stopAutoCaptureLoop = stopCameraAndLoop;
 
       const video = document.getElementById('camera-video-preview');
@@ -2413,7 +2426,11 @@ const ExpensesPage = {
         if (uploadBtns) uploadBtns.style.display = 'flex';
         const galleryInput = document.getElementById('ef-receipt-gallery');
         if (galleryInput) galleryInput.value = '';
-        goToStep1();
+        if (isAppEnvironment) {
+          goToStep1();
+        } else {
+          galleryInput?.click();
+        }
       });
     }
 
@@ -2454,8 +2471,8 @@ const ExpensesPage = {
       });
     }
 
-    // Se nova despesa normal, inicia a câmera com auto-capture imediatamente
-    if (isNewReceiptExpense) {
+    // Se nova despesa normal e ambiente de App, inicia a câmera com auto-capture imediatamente
+    if (isNewReceiptExpense && isAppEnvironment) {
       startCameraWithAutoCapture();
     }
   },
