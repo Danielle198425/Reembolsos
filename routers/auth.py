@@ -38,7 +38,7 @@ def _get_azure_redirect_uri(request: Request) -> str:
 
 
 def _render_auth_success(token: str) -> HTMLResponse:
-    """Renderiza página de transição que salva o token no localStorage e redireciona para a home."""
+    """Renderiza página de transição que salva o token no localStorage e cookie e redireciona para a home."""
     html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -68,7 +68,7 @@ def _render_auth_success(token: str) -> HTMLResponse:
             width: 36px;
             height: 36px;
             border: 3.5px solid #e2e8f0;
-            border-top: 3.5px solid #1e40af;
+            border-top: 3.5px solid #1B5E20;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             margin: 0 auto 20px auto;
@@ -92,14 +92,36 @@ def _render_auth_success(token: str) -> HTMLResponse:
             localStorage.setItem('ml_token', '{token}');
             localStorage.setItem('token', '{token}');
             sessionStorage.setItem('ml_token', '{token}');
+            document.cookie = "ml_token={token}; path=/; max-age=28800; SameSite=Lax; Secure";
+            document.cookie = "token={token}; path=/; max-age=28800; SameSite=Lax; Secure";
             window.location.replace('/?token={token}');
         }} catch(e) {{
+            document.cookie = "ml_token={token}; path=/; max-age=28800; SameSite=Lax; Secure";
             window.location.href = '/?token={token}';
         }}
     </script>
 </body>
 </html>"""
-    return HTMLResponse(content=html)
+    resp = HTMLResponse(content=html)
+    resp.set_cookie(
+        key="ml_token",
+        value=token,
+        max_age=28800,
+        path="/",
+        samesite="lax",
+        secure=True,
+        httponly=False
+    )
+    resp.set_cookie(
+        key="token",
+        value=token,
+        max_age=28800,
+        path="/",
+        samesite="lax",
+        secure=True,
+        httponly=False
+    )
+    return resp
 
 
 def _render_auth_error(message: str, status_code: int = 403) -> HTMLResponse:

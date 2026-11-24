@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status, Query
+from fastapi import Depends, HTTPException, status, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from database import get_db
@@ -43,6 +43,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     token: Optional[str] = Query(None),
+    request: Request = None,
     db: Session = Depends(get_db)
 ) -> models.User:
     credentials_exception = HTTPException(
@@ -56,6 +57,10 @@ def get_current_user(
         raw_token = credentials.credentials
     elif token:
         raw_token = token
+    elif request and request.cookies.get("ml_token"):
+        raw_token = request.cookies.get("ml_token")
+    elif request and request.cookies.get("token"):
+        raw_token = request.cookies.get("token")
 
     if not raw_token:
         raise credentials_exception

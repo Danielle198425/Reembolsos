@@ -70,7 +70,28 @@ _MIGRATIONS = [
 ]
 
 
-def run_auto_migrations():
+_MIGRATIONS_APPLIED = False
+
+
+def run_auto_migrations(force: bool = False):
+    global _MIGRATIONS_APPLIED
+    if _MIGRATIONS_APPLIED and not force:
+        return
+
+    # Em ambiente Vercel (serverless lambda), o banco de produção já possui o schema inicializado.
+    # Evita executar dezenas de queries DDL bloqueantes (ALTER TABLE, DROP/ADD CONSTRAINT) a cada cold start,
+    # reduzindo o tempo de inicialização de ~8s para milissegundos.
+    if IS_VERCEL and not force and os.environ.get("FORCE_MIGRATIONS") != "1":
+        try:
+            with engine.connect() as conn:
+                chk = conn.execute(text("SELECT 1 FROM users LIMIT 1;"))
+                if chk.fetchone() is not None:
+                    _MIGRATIONS_APPLIED = True
+                    return
+        except Exception:
+            pass
+
+    _MIGRATIONS_APPLIED = True
     # Garante a criação de todas as tabelas mapeadas no SQLAlchemy (ex: user_saved_addresses)
     try:
         Base.metadata.create_all(bind=engine)

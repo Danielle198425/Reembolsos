@@ -421,26 +421,86 @@ async function tryAutoLogin() {
   const urlParams = new URLSearchParams(window.location.search);
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const urlToken = urlParams.get('token') || hashParams.get('token');
+  const urlError = urlParams.get('error') || hashParams.get('error');
+
+  // Se houver token na URL (vindo do callback do Entra ID)
   if (urlToken) {
     Api.setToken(urlToken);
     try {
       window.history.replaceState({}, document.title, window.location.pathname);
     } catch (e) {}
+  } else if (urlError || urlParams.has('code') || urlParams.has('state')) {
+    // Limpa parâmetros residuais da URL
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (e) {}
+  }
+
+  if (urlError) {
+    showLogin();
+    const errEl = document.getElementById('login-error');
+    if (errEl) {
+      errEl.textContent = decodeURIComponent(urlError);
+      errEl.classList.remove('hidden');
+    }
+    return;
   }
 
   const token = Api.getToken();
-  if (!token) { showLogin(); return; }
-  try {
-    const user = await Api.me();
+  if (!token) {
+    showLogin();
+    return;
+  }
+
+  // Tenta validar o token via /api/auth/me com resiliência contra cold starts da Vercel
+  let user = null;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      user = await Api.me();
+      if (user) break;
+    } catch (err) {
+      lastErr = err;
+      const isAuthError = err && err.message && (
+        err.message.includes('401') ||
+        err.message.includes('Credenciais') ||
+        err.message.includes('expiradas') ||
+        err.message.includes('não cadastrado')
+      );
+      if (isAuthError) {
+        break; // Token realmente inválido
+      }
+      // Se for cold-start ou erro de conexão transitório, aguarda 1s e tenta novamente
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+  }
+
+  if (user) {
     showApp(user);
-  } catch (err) {
-    Api.setToken(null);
-    sessionStorage.removeItem('ml_impersonator_token');
-    sessionStorage.removeItem('ml_impersonator_user');
+    try {
+      if (window.location.search || window.location.hash.includes('token')) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (e) {}
+  } else {
+    // Só apaga o token se for comprovadamente erro de autenticação (401/403)
+    const isAuthError = lastErr && lastErr.message && (
+      lastErr.message.includes('401') ||
+      lastErr.message.includes('Credenciais') ||
+      lastErr.message.includes('expiradas') ||
+      lastErr.message.includes('não cadastrado')
+    );
+    if (isAuthError) {
+      Api.setToken(null);
+      sessionStorage.removeItem('ml_impersonator_token');
+      sessionStorage.removeItem('ml_impersonator_user');
+    }
     showLogin();
     const errEl = document.getElementById('login-error');
-    if (errEl && err && err.message && !err.message.includes('401') && !err.message.includes('Credenciais')) {
-      errEl.textContent = err.message;
+    if (errEl && lastErr && lastErr.message && !lastErr.message.includes('401') && !lastErr.message.includes('Credenciais')) {
+      errEl.textContent = lastErr.message;
       errEl.classList.remove('hidden');
     }
   }

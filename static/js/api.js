@@ -19,13 +19,41 @@ const Api = {
   _token: null,
 
   getToken() {
-    return this._token || localStorage.getItem('ml_token');
+    if (this._token) return this._token;
+    const ls = localStorage.getItem('ml_token') || localStorage.getItem('token');
+    if (ls) {
+      this._token = ls;
+      return ls;
+    }
+    try {
+      const match = document.cookie.match(/(?:^|;\s*)(?:ml_token|token)=([^;]+)/);
+      if (match && match[1]) {
+        const cToken = decodeURIComponent(match[1]);
+        this._token = cToken;
+        localStorage.setItem('ml_token', cToken);
+        return cToken;
+      }
+    } catch (e) {}
+    return null;
   },
 
   setToken(token) {
     this._token = token;
-    if (token) localStorage.setItem('ml_token', token);
-    else localStorage.removeItem('ml_token');
+    if (token) {
+      localStorage.setItem('ml_token', token);
+      localStorage.setItem('token', token);
+      try {
+        document.cookie = `ml_token=${encodeURIComponent(token)}; path=/; max-age=28800; SameSite=Lax; Secure`;
+        document.cookie = `token=${encodeURIComponent(token)}; path=/; max-age=28800; SameSite=Lax; Secure`;
+      } catch (e) {}
+    } else {
+      localStorage.removeItem('ml_token');
+      localStorage.removeItem('token');
+      try {
+        document.cookie = 'ml_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
+      } catch (e) {}
+    }
   },
 
   async _request(method, path, body = null, isFormData = false) {
