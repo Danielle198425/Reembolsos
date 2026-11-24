@@ -35,7 +35,7 @@ def run_seed():
 
         # Seedar Logo oficial da Moura Leite se não existir ou atualizar
         import base64, os
-        logo_png_path = os.path.join("static", "icons", "logo-stacked.png")
+        logo_png_path = os.path.join("static", "icons", "logo-icon.png")
         if os.path.exists(logo_png_path):
             with open(logo_png_path, "rb") as f:
                 logo_b64 = "data:image/png;base64," + base64.b64encode(f.read()).decode("utf-8")
@@ -43,7 +43,7 @@ def run_seed():
             if not logo_entry:
                 db.add(models.CompanyLogo(data=logo_b64))
                 db.commit()
-            elif logo_entry and (not logo_entry.data or "svg" in logo_entry.data or len(logo_entry.data) < 1000):
+            elif logo_entry:
                 logo_entry.data = logo_b64
                 db.commit()
 

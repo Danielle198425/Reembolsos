@@ -76,7 +76,7 @@ const ROLE_LABELS = {
 async function applyAppLogo() {
   try {
     const res = await Api.getLogo();
-    const logoData = (res && res.data) ? res.data : '/static/icons/logo-stacked.svg';
+    const logoData = (res && res.data) ? res.data : '/static/icons/logo-icon.svg';
     const loginLogo = document.getElementById('login-logo-mark');
     if (loginLogo) {
       loginLogo.innerHTML = `<img src="${logoData}" style="max-height:100%; max-width:100%; object-fit:contain; display:block; margin:auto;" alt="Moura Leite" />`;

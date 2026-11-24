@@ -2107,12 +2107,54 @@ const ExpensesPage = {
             const strVal = Number(amountVal).toFixed(2).replace('.', ',');
             document.getElementById('ef-amount').value = 'R$ ' + strVal;
           }
-          if (data.category_suggestion) {
-            const sel = document.getElementById('ef-category');
-            for (let i = 0; i < sel.options.length; i++) {
-              if (sel.options[i].text.toLowerCase().includes(data.category_suggestion.toLowerCase())) {
-                sel.selectedIndex = i;
-                break;
+          // Preenchimento automático da categoria de alimentação com base no horário de emissão
+          const tTime = data.transaction_time || data.hora;
+          let targetCategoryName = null;
+          if (data.is_food_expense && tTime) {
+            const timeMatch = String(tTime).match(/\b(\d{1,2}):(\d{2})\b/);
+            if (timeMatch) {
+              const h = parseInt(timeMatch[1], 10);
+              const m = parseInt(timeMatch[2], 10);
+              const totalMinutes = h * 60 + m;
+
+              // Até 11:00 (00:00 até 11:00): Café da Manhã
+              if (totalMinutes <= 11 * 60) {
+                targetCategoryName = 'Café da Manhã';
+              } else if (totalMinutes <= 17 * 60 + 59) { // De 11:01 até 17:59: Almoço
+                targetCategoryName = 'Almoço';
+              } else { // A partir das 18:00 (18:00 até 23:59): Jantar
+                targetCategoryName = 'Jantar';
+              }
+            }
+          }
+
+          const sel = document.getElementById('ef-category') || document.getElementById('expense-category');
+          if (sel) {
+            let matched = false;
+            if (targetCategoryName) {
+              const cleanTarget = targetCategoryName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              for (let i = 0; i < sel.options.length; i++) {
+                const optText = (sel.options[i].text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const optName = (sel.options[i].getAttribute('data-name') || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                if (optText.includes(cleanTarget) || optName.includes(cleanTarget)) {
+                  sel.selectedIndex = i;
+                  matched = true;
+                  break;
+                }
+              }
+              if (matched) {
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            } else if (data.category_suggestion) {
+              for (let i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].text.toLowerCase().includes(data.category_suggestion.toLowerCase())) {
+                  sel.selectedIndex = i;
+                  matched = true;
+                  break;
+                }
+              }
+              if (matched) {
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
               }
             }
           }
