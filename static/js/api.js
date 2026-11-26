@@ -295,6 +295,7 @@ const Api = {
   // ── Saved Addresses (Quilometragem) ───────────────────────────────────────
   getSavedAddresses() { return Api.get('/api/users/saved-addresses'); },
   saveFavoriteAddress(data) { return Api.post('/api/users/saved-addresses/favorite', data); },
+  updateFavoriteAddress(id, data) { return Api.put(`/api/users/saved-addresses/favorite/${id}`, data); },
   removeFavoriteAddress(id) { return Api.delete(`/api/users/saved-addresses/favorite/${id}`); },
   addRecentAddress(data) { return Api.post('/api/users/saved-addresses/recent', data); },
 

@@ -335,6 +335,8 @@ class UserSavedAddress(Base):
     address = Column(Text, nullable=False)
     label = Column(String(100), nullable=True)
     is_favorite = Column(Boolean, default=False, nullable=False)
+    toll_items = Column(Text, nullable=True)  # JSON serializado com [{name, amount}, ...]
+    toll_total = Column(Float, nullable=True)
     last_used_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

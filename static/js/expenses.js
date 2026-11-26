@@ -1555,6 +1555,9 @@ const ExpensesPage = {
     }
 
 
+    this._activeFavorite = null;
+    this._favoriteChangeDismissed = false;
+
     const isFormImpersonated = Boolean(sessionStorage.getItem('ml_impersonator_token'));
     const isAppEnvironment = (() => {
       const isMobileDevice = /Android|iPhone|iPad|iPod|Windows Phone|webOS|BlackBerry|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent || '');
@@ -1775,6 +1778,21 @@ const ExpensesPage = {
                 </div>
                 <div id="km-toll-total-badge" style="font-size:13px;font-weight:800;color:#b45309;">
                   Total pedágios: R$ 0,00
+                </div>
+              </div>
+
+              <!-- Banner discreto de detecção de alteração de pedágio em relação ao favorito -->
+              <div id="km-toll-fav-update-banner" style="display:none;margin-top:10px;padding:10px 14px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;">
+                <div style="font-size:12px;color:#92400e;line-height:1.4;margin-bottom:8px;">
+                  <span>⚠️</span> Valor de pedágio alterado em relação ao favorito <strong id="km-toll-fav-name">[Nome do Favorito]</strong>. Deseja salvar este novo valor no endereço favorito?
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-sm btn-primary" id="btn-update-fav-tolls" style="font-size:12px;padding:5px 12px;background:#d97706;border-color:#b45309;">
+                    Sim, atualizar favorito
+                  </button>
+                  <button type="button" class="btn btn-sm btn-secondary" id="btn-dismiss-fav-tolls" style="font-size:12px;padding:5px 10px;">
+                    Não
+                  </button>
                 </div>
               </div>
             </div>
@@ -2989,6 +3007,85 @@ const ExpensesPage = {
         breakdownEl.innerHTML = '';
       }
     }
+
+    // Detecção de alteração de pedágio em relação ao favorito ativo
+    const favBanner = document.getElementById('km-toll-fav-update-banner');
+    const favNameEl = document.getElementById('km-toll-fav-name');
+    if (favBanner && ExpensesPage._activeFavorite && ExpensesPage._activeFavorite.id && ExpensesPage._activeFavorite.originalFavoriteTolls) {
+      if (ExpensesPage._favoriteChangeDismissed) {
+        favBanner.style.display = 'none';
+      } else {
+        const origTolls = ExpensesPage._activeFavorite.originalFavoriteTolls || [];
+        let hasDiff = false;
+        if (plazaValues.length !== origTolls.length) {
+          hasDiff = true;
+        } else {
+          for (let i = 0; i < plazaValues.length; i++) {
+            const curCent = Math.round((plazaValues[i].value || 0) * 100);
+            const origCent = Math.round((origTolls[i].value !== undefined ? origTolls[i].value : (origTolls[i].amount || 0)) * 100);
+            if (curCent !== origCent) {
+              hasDiff = true;
+              break;
+            }
+          }
+        }
+
+        if (hasDiff) {
+          if (favNameEl) {
+            favNameEl.textContent = ExpensesPage._activeFavorite.label || ExpensesPage._activeFavorite.address.split(',')[0];
+          }
+          favBanner.style.display = 'block';
+
+          // Bind banner buttons
+          const updateBtn = document.getElementById('btn-update-fav-tolls');
+          const dismissBtn = document.getElementById('btn-dismiss-fav-tolls');
+
+          if (updateBtn) {
+            updateBtn.onclick = async (e) => {
+              e.preventDefault();
+              updateBtn.disabled = true;
+              updateBtn.textContent = 'Salvando...';
+              try {
+                const currentPlazaItems = (ExpensesPage._kmData?.plazaValues || []).map(p => ({
+                  name: p.name,
+                  amount: p.value
+                }));
+                const curTotal = ExpensesPage._kmData?.tollUnit || 0;
+                await Api.updateFavoriteAddress(ExpensesPage._activeFavorite.id, {
+                  toll_items: currentPlazaItems,
+                  toll_total: curTotal
+                });
+                ExpensesPage._activeFavorite.toll_items = currentPlazaItems;
+                ExpensesPage._activeFavorite.toll_total = curTotal;
+                ExpensesPage._activeFavorite.originalFavoriteTolls = JSON.parse(JSON.stringify(ExpensesPage._kmData?.plazaValues || []));
+                ExpensesPage._favoriteChangeDismissed = false;
+                favBanner.style.display = 'none';
+                if (typeof toast === 'function') toast('Valores de pedágio do favorito atualizados com sucesso!', 'success');
+                await ExpensesPage.loadSavedAddresses();
+              } catch(err) {
+                console.warn('Erro ao atualizar pedágios do favorito:', err);
+                if (typeof toast === 'function') toast(err.message || 'Erro ao atualizar favorito', 'error');
+              } finally {
+                updateBtn.disabled = false;
+                updateBtn.textContent = 'Sim, atualizar favorito';
+              }
+            };
+          }
+
+          if (dismissBtn) {
+            dismissBtn.onclick = (e) => {
+              e.preventDefault();
+              ExpensesPage._favoriteChangeDismissed = true;
+              favBanner.style.display = 'none';
+            };
+          }
+        } else {
+          favBanner.style.display = 'none';
+        }
+      }
+    } else if (favBanner) {
+      favBanner.style.display = 'none';
+    }
   },
 
 
@@ -3054,14 +3151,47 @@ const ExpensesPage = {
       saveBtn.addEventListener('click', async (ev) => {
         ev.preventDefault();
         const label = document.getElementById('km-fav-label-input')?.value.trim() || null;
+
+        // Coleta as praças e valores de pedágio atualmente visíveis (se já houver rota calculada)
+        const plazaItems = [];
+        let tollSum = 0;
+        const itemInputs = document.querySelectorAll('.km-toll-item-input');
+        if (itemInputs && itemInputs.length > 0) {
+          itemInputs.forEach((inp, idx) => {
+            const pVal = parseFloat((inp.value || '').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            const pName = (ExpensesPage._kmData?.plazaValues && ExpensesPage._kmData.plazaValues[idx])
+              ? ExpensesPage._kmData.plazaValues[idx].name
+              : ((ExpensesPage._kmData?.tollPoints && ExpensesPage._kmData.tollPoints[idx]) || `Praça ${idx + 1}`);
+            plazaItems.push({ name: pName, amount: pVal });
+            tollSum += pVal;
+          });
+        } else {
+          const rawToll = (document.getElementById('km-toll-input')?.value || '').replace(/[^\d.,]/g, '').replace(',', '.');
+          const pVal = parseFloat(rawToll) || 0;
+          if (pVal > 0) {
+            plazaItems.push({ name: 'Pedágio', amount: pVal });
+            tollSum = pVal;
+          }
+        }
+
         saveBtn.disabled = true;
         saveBtn.textContent = 'Salvando...';
         try {
-          await Api.saveFavoriteAddress({ address: dest, label });
+          const resFav = await Api.saveFavoriteAddress({ address: dest, label, toll_items: plazaItems, toll_total: tollSum });
           await ExpensesPage.loadSavedAddresses();
+          ExpensesPage._activeFavorite = {
+            id: resFav.id,
+            label: resFav.label || resFav.address.split(',')[0],
+            address: resFav.address,
+            toll_items: plazaItems,
+            toll_total: tollSum,
+            originalFavoriteTolls: JSON.parse(JSON.stringify(plazaItems))
+          };
+          ExpensesPage._favoriteChangeDismissed = false;
+
           promptEl.innerHTML = `
             <div style="font-size:12.5px;color:#15803d;font-weight:600;display:flex;align-items:center;gap:6px;width:100%;">
-              <span>✅</span> Endereço salvo nos seus favoritos com sucesso!
+              <span>✅</span> Endereço e valores de pedágio salvos nos favoritos com sucesso!
             </div>
           `;
           if (typeof toast === 'function') toast('Endereço adicionado aos favoritos!', 'success');
@@ -3087,12 +3217,50 @@ const ExpensesPage = {
     let timeoutId = null;
 
     const bindDropdownEvents = () => {
-      const selectAddr = (e, addr) => {
+      const selectAddr = (e, addr, favId = null) => {
         e.preventDefault();
         e.stopPropagation();
         input.value = addr;
         dropdown.classList.add('hidden');
         dropdown.innerHTML = '';
+
+        if (inputId === 'km-dest') {
+          let favObj = null;
+          if (favId) {
+            favObj = (ExpensesPage._savedAddresses?.favorites || []).find(f => f.id === favId);
+          } else {
+            const normAddr = addr.toLowerCase().replace(/\s+/g, ' ');
+            favObj = (ExpensesPage._savedAddresses?.favorites || []).find(
+              f => f.address.toLowerCase().replace(/\s+/g, ' ') === normAddr
+            );
+          }
+
+          if (favObj) {
+            let parsedItems = [];
+            try {
+              if (typeof favObj.toll_items === 'string') {
+                parsedItems = JSON.parse(favObj.toll_items || '[]');
+              } else if (Array.isArray(favObj.toll_items)) {
+                parsedItems = favObj.toll_items;
+              }
+            } catch(e) {
+              parsedItems = [];
+            }
+            ExpensesPage._activeFavorite = {
+              id: favObj.id,
+              label: favObj.label || favObj.address.split(',')[0],
+              address: favObj.address,
+              toll_items: parsedItems,
+              toll_total: favObj.toll_total || 0,
+              originalFavoriteTolls: JSON.parse(JSON.stringify(parsedItems))
+            };
+            ExpensesPage._favoriteChangeDismissed = false;
+          } else {
+            ExpensesPage._activeFavorite = null;
+            ExpensesPage._favoriteChangeDismissed = false;
+          }
+          ExpensesPage._checkDestFavoritePrompt();
+        }
 
         const originVal = document.getElementById('km-origin')?.value.trim();
         const destVal = document.getElementById('km-dest')?.value.trim();
@@ -3103,9 +3271,10 @@ const ExpensesPage = {
 
       dropdown.querySelectorAll('.autocomplete-item[data-address]').forEach(el => {
         const addr = el.dataset.address;
+        const favId = el.dataset.favId ? parseInt(el.dataset.favId) : null;
         const onSelect = (e) => {
           if (e.target.closest('.fav-remove-btn')) return;
-          selectAddr(e, addr);
+          selectAddr(e, addr, favId);
         };
         el.addEventListener('mousedown', onSelect);
         el.addEventListener('pointerdown', onSelect);
@@ -3152,7 +3321,7 @@ const ExpensesPage = {
             : `⭐ ${escHtml(f.address.split(',')[0])}`;
 
           html += `
-            <div class="autocomplete-item autocomplete-item-fav" data-address="${escHtml(f.address)}">
+            <div class="autocomplete-item autocomplete-item-fav" data-address="${escHtml(f.address)}" data-fav-id="${f.id}">
               <div class="fav-main-content">
                 <span class="autocomplete-item-title">${mainTitle}</span>
                 <span class="autocomplete-item-sub">${escHtml(f.address)}</span>
@@ -3198,6 +3367,16 @@ const ExpensesPage = {
       clearTimeout(timeoutId);
       const query = e.target.value.trim();
 
+      if (inputId === 'km-dest') {
+        const curDest = query.toLowerCase().replace(/\s+/g, ' ');
+        if (ExpensesPage._activeFavorite && ExpensesPage._activeFavorite.address.toLowerCase().replace(/\s+/g, ' ') !== curDest) {
+          ExpensesPage._activeFavorite = null;
+          ExpensesPage._favoriteChangeDismissed = false;
+          const banner = document.getElementById('km-toll-fav-update-banner');
+          if (banner) banner.style.display = 'none';
+        }
+      }
+
       if (query.length < 3) {
         if (inputId === 'km-dest' && showSavedMenu()) {
           return;
@@ -3226,7 +3405,7 @@ const ExpensesPage = {
                   ? `<span class="fav-label-badge">${escHtml(f.label)}</span>${escHtml(f.address.split(',')[0])}`
                   : `⭐ ${escHtml(f.address.split(',')[0])}`;
                 savedMatchesHtml += `
-                  <div class="autocomplete-item autocomplete-item-fav" data-address="${escHtml(f.address)}">
+                  <div class="autocomplete-item autocomplete-item-fav" data-address="${escHtml(f.address)}" data-fav-id="${f.id}">
                     <div class="fav-main-content">
                       <span class="autocomplete-item-title">${mainTitle}</span>
                       <span class="autocomplete-item-sub">${escHtml(f.address)}</span>
@@ -3380,11 +3559,38 @@ const ExpensesPage = {
 
         if (tollListEl) {
           if (tollPoints.length > 0) {
-            plazaValues = tollPoints.map(name => ({ name, value: 0 }));
+            const favTolls = ExpensesPage._activeFavorite?.toll_items || [];
+            plazaValues = tollPoints.map((name, idx) => {
+              let matchedVal = 0;
+              if (favTolls.length > 0) {
+                const normName = name.toLowerCase();
+                const byName = favTolls.find(t => {
+                  if (!t.name) return false;
+                  const tNorm = t.name.toLowerCase();
+                  return tNorm === normName || normName.includes(tNorm) || tNorm.includes(normName);
+                });
+                if (byName) {
+                  matchedVal = parseFloat(byName.amount !== undefined ? byName.amount : byName.value) || 0;
+                } else if (favTolls[idx]) {
+                  matchedVal = parseFloat(favTolls[idx].amount !== undefined ? favTolls[idx].amount : favTolls[idx].value) || 0;
+                }
+              }
+              return { name, value: matchedVal };
+            });
+
+            // Guarda snapshot dos valores originais carregados do favorito para detecção de alterações
+            if (ExpensesPage._activeFavorite) {
+              ExpensesPage._activeFavorite.originalFavoriteTolls = JSON.parse(JSON.stringify(plazaValues));
+              ExpensesPage._favoriteChangeDismissed = false;
+            }
+
+            const hasRestoredFav = Boolean(ExpensesPage._activeFavorite && plazaValues.some(p => p.value > 0));
+
             tollListEl.innerHTML = `
-              <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:5px;">
+              <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
                 <span>📍</span>
                 <span>Praças identificadas na rota (${tollPoints.length}):</span>
+                ${hasRestoredFav ? `<span style="font-size:11px;font-weight:700;color:#15803d;background:#dcfce7;border:1px solid #86efac;padding:1px 7px;border-radius:12px;margin-left:auto;">Valores restaurados do favorito ⭐</span>` : ''}
               </div>
               ${plazaValues.map((p, idx) => `
                 <div class="km-toll-plaza-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #fef3c7;">
@@ -3393,7 +3599,7 @@ const ExpensesPage = {
                   </div>
                   <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
                     <span style="font-size:12px;font-weight:600;color:#92400e;">R$</span>
-                    <input type="text" class="km-toll-item-input" data-index="${idx}" placeholder="0,00" value="" style="width:85px;font-size:13px;font-weight:700;color:#1e293b;padding:5px 8px;border-radius:6px;border:1px solid #f59e0b;background:#fff;text-align:right;" />
+                    <input type="text" class="km-toll-item-input" data-index="${idx}" placeholder="0,00" value="${p.value > 0 ? p.value.toFixed(2).replace('.', ',') : ''}" style="width:85px;font-size:13px;font-weight:700;color:#1e293b;padding:5px 8px;border-radius:6px;border:1px solid #f59e0b;background:#fff;text-align:right;" />
                   </div>
                 </div>
               `).join('')}
@@ -3411,9 +3617,14 @@ const ExpensesPage = {
           }
         }
 
-        if (apiTollAmount && apiTollAmount > 0) {
+        if (plazaValues.length > 0) {
+          initialTollUnit = plazaValues.reduce((acc, p) => acc + (p.value || 0), 0);
+        } else if (apiTollAmount && apiTollAmount > 0) {
           initialTollUnit = apiTollAmount;
           if (tollInput) tollInput.value = apiTollAmount.toFixed(2).replace('.', ',');
+        } else if (ExpensesPage._activeFavorite?.toll_total > 0) {
+          initialTollUnit = ExpensesPage._activeFavorite.toll_total;
+          if (tollInput) tollInput.value = initialTollUnit.toFixed(2).replace('.', ',');
         } else {
           initialTollUnit = 0;
           if (tollInput) tollInput.value = '';
@@ -3426,6 +3637,8 @@ const ExpensesPage = {
           tollListEl.innerHTML = '';
         }
         if (generalWrap) generalWrap.style.display = 'none';
+        const favBanner = document.getElementById('km-toll-fav-update-banner');
+        if (favBanner) favBanner.style.display = 'none';
       }
 
       this._kmData = { 

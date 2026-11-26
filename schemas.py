@@ -1,5 +1,5 @@
 import json
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 from datetime import datetime, date
 from pydantic import BaseModel, EmailStr, field_validator
 from models import UserRole, ExpenseStatus
@@ -383,6 +383,8 @@ class SavedAddressOut(BaseModel):
     address: str
     label: Optional[str] = None
     is_favorite: bool
+    toll_items: Optional[str] = None
+    toll_total: Optional[float] = None
     last_used_at: datetime
     created_at: datetime
 
@@ -401,6 +403,15 @@ class SavedAddressesResponse(BaseModel):
 class SaveFavoriteRequest(BaseModel):
     address: str
     label: Optional[str] = None
+    toll_items: Optional[Union[str, List[Any]]] = None
+    toll_total: Optional[float] = None
+
+
+class UpdateFavoriteRequest(BaseModel):
+    address: Optional[str] = None
+    label: Optional[str] = None
+    toll_items: Optional[Union[str, List[Any]]] = None
+    toll_total: Optional[float] = None
 
 
 class AddRecentRequest(BaseModel):

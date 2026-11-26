@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -25,10 +26,17 @@ def _ensure_saved_addresses_table(db: Session):
                     address TEXT NOT NULL,
                     label VARCHAR(100),
                     is_favorite BOOLEAN NOT NULL DEFAULT 0,
+                    toll_items TEXT,
+                    toll_total REAL,
                     last_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
             """))
+            cols = {row[1] for row in db.execute(text("PRAGMA table_info(user_saved_addresses)"))}
+            if "toll_items" not in cols:
+                db.execute(text("ALTER TABLE user_saved_addresses ADD COLUMN toll_items TEXT;"))
+            if "toll_total" not in cols:
+                db.execute(text("ALTER TABLE user_saved_addresses ADD COLUMN toll_total REAL;"))
         else:
             db.execute(text("""
                 CREATE TABLE IF NOT EXISTS user_saved_addresses (
@@ -37,11 +45,15 @@ def _ensure_saved_addresses_table(db: Session):
                     address TEXT NOT NULL,
                     label VARCHAR(100),
                     is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
+                    toll_items TEXT,
+                    toll_total DOUBLE PRECISION,
                     last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE INDEX IF NOT EXISTS ix_user_saved_addresses_user_id ON user_saved_addresses(user_id);
                 CREATE INDEX IF NOT EXISTS ix_user_saved_addresses_id ON user_saved_addresses(id);
+                ALTER TABLE user_saved_addresses ADD COLUMN IF NOT EXISTS toll_items TEXT;
+                ALTER TABLE user_saved_addresses ADD COLUMN IF NOT EXISTS toll_total DOUBLE PRECISION;
             """))
         db.commit()
         _table_checked = True
@@ -126,6 +138,13 @@ def save_favorite_address(
     clean_label = (req.label or "").strip() if req.label else None
     norm = _normalize(clean_addr)
 
+    toll_items_str = None
+    if req.toll_items is not None:
+        if isinstance(req.toll_items, list):
+            toll_items_str = json.dumps(req.toll_items, ensure_ascii=False)
+        else:
+            toll_items_str = str(req.toll_items)
+
     _ensure_saved_addresses_table(db)
 
     try:
@@ -146,6 +165,10 @@ def save_favorite_address(
             matched.is_favorite = True
             if clean_label:
                 matched.label = clean_label
+            if toll_items_str is not None:
+                matched.toll_items = toll_items_str
+            if req.toll_total is not None:
+                matched.toll_total = req.toll_total
             matched.last_used_at = datetime.utcnow()
             db.commit()
             db.refresh(matched)
@@ -157,6 +180,8 @@ def save_favorite_address(
             address=clean_addr,
             label=clean_label,
             is_favorite=True,
+            toll_items=toll_items_str,
+            toll_total=req.toll_total,
             last_used_at=datetime.utcnow(),
             created_at=datetime.utcnow()
         )
@@ -170,6 +195,49 @@ def save_favorite_address(
         db.rollback()
         print(f"[save_favorite_address] Erro: {e}")
         raise HTTPException(status_code=500, detail=f"Erro ao salvar favorito: {str(e)}")
+
+
+@router.put("/saved-addresses/favorite/{address_id}", response_model=schemas.SavedAddressOut)
+@router.patch("/saved-addresses/favorite/{address_id}", response_model=schemas.SavedAddressOut)
+def update_favorite_address(
+    address_id: int,
+    req: schemas.UpdateFavoriteRequest,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    _ensure_saved_addresses_table(db)
+    item = (
+        db.query(models.UserSavedAddress)
+        .filter(
+            models.UserSavedAddress.id == address_id,
+            models.UserSavedAddress.user_id == current_user.id,
+            models.UserSavedAddress.is_favorite == True
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Endereço favorito não encontrado.")
+
+    try:
+        if req.address:
+            item.address = req.address.strip()
+        if req.label is not None:
+            item.label = req.label.strip() if req.label else None
+        if req.toll_items is not None:
+            if isinstance(req.toll_items, list):
+                item.toll_items = json.dumps(req.toll_items, ensure_ascii=False)
+            else:
+                item.toll_items = str(req.toll_items)
+        if req.toll_total is not None:
+            item.toll_total = req.toll_total
+        item.last_used_at = datetime.utcnow()
+        db.commit()
+        db.refresh(item)
+        return item
+    except Exception as e:
+        db.rollback()
+        print(f"[update_favorite_address] Erro: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao atualizar favorito: {str(e)}")
 
 
 @router.delete("/saved-addresses/favorite/{address_id}")

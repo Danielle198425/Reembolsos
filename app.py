@@ -67,6 +67,9 @@ _MIGRATIONS = [
     ("category_override_rules", "cost_center_ids", "TEXT"),
 
     ("mileage_rates", "applicable_functions", "TEXT"),
+
+    ("user_saved_addresses", "toll_items", "TEXT"),
+    ("user_saved_addresses", "toll_total", "FLOAT"),
 ]
 
 
@@ -109,6 +112,8 @@ def run_auto_migrations(force: bool = False):
                         address TEXT NOT NULL,
                         label VARCHAR(100),
                         is_favorite BOOLEAN NOT NULL DEFAULT 0,
+                        toll_items TEXT,
+                        toll_total REAL,
                         last_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
                     );
@@ -121,6 +126,8 @@ def run_auto_migrations(force: bool = False):
                         address TEXT NOT NULL,
                         label VARCHAR(100),
                         is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
+                        toll_items TEXT,
+                        toll_total DOUBLE PRECISION,
                         last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                     );
