@@ -189,25 +189,27 @@ def get_category_full_name(category, expense=None) -> str:
 def _get_logo_flowable():
     logo_icon_path = os.path.join("static", "icons", "logo-icon.png")
     if os.path.exists(logo_icon_path):
-        icon_img = RLImage(logo_icon_path, width=1.4*cm, height=1.4*cm)
-        text_para = Paragraph(
-            '<font color="#15803D" size="14"><b>MOURA LEITE</b></font><br/>'
-            '<font color="#166534" size="8">LOTEAMENTOS</font>',
-            getSampleStyleSheet()["Normal"]
-        )
-        logo_table = Table([[icon_img, text_para]], colWidths=[1.6*cm, 4.5*cm])
-        logo_table.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ]))
-        return logo_table
-    else:
-        return Paragraph(
-            '<font color="#15803D" size="16"><b>Moura Leite</b></font><br/>'
-            '<font color="#166534" size="9">Sistema de Reembolsos</font>',
-            getSampleStyleSheet()["Normal"]
-        )
+        try:
+            icon_img = RLImage(logo_icon_path, width=1.4*cm, height=1.4*cm)
+            text_para = Paragraph(
+                '<font color="#15803D" size="14"><b>MOURA LEITE</b></font><br/>'
+                '<font color="#166534" size="8">LOTEAMENTOS</font>',
+                getSampleStyleSheet()["Normal"]
+            )
+            logo_table = Table([[icon_img, text_para]], colWidths=[1.6*cm, 4.5*cm])
+            logo_table.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            return logo_table
+        except Exception:
+            pass
+    return Paragraph(
+        '<font color="#15803D" size="16"><b>Moura Leite</b></font><br/>'
+        '<font color="#166534" size="9">Sistema de Reembolsos</font>',
+        getSampleStyleSheet()["Normal"]
+    )
 
 
 def generate_expense_pdf(expense, output_path: str):
