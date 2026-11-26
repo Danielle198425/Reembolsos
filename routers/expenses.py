@@ -213,10 +213,10 @@ def _expense_out(e: models.Expense) -> dict:
             )
         ) if getattr(e, 'notes', None) or getattr(e, 'description', None) else None,
         "toll_points": (
-            [p.strip() for p in __m_pts.group(1).split(",") if p.strip()]
+            [p.strip() for p in __import__('re').split(r"[;,]", __m_pts.group(1)) if p.strip()]
             if getattr(e, 'notes', None) and (__m_pts := __import__('re').search(r"\[Praças:\s*(.*?)\]", e.notes or ""))
             else (
-                [p.strip() for p in __m_pts2.group(1).split(",") if p.strip()]
+                [p.strip() for p in __import__('re').split(r"[;,]", __m_pts2.group(1)) if p.strip()]
                 if getattr(e, 'description', None) and (__m_pts2 := __import__('re').search(r"\[Praças:\s*(.*?)\]", e.description or ""))
                 else []
             )

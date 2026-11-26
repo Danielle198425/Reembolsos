@@ -1223,6 +1223,12 @@ tbody td {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
+tbody tr.empty-state-row td,
+#page-exports tbody tr.empty-state-row td {
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 48px 16px !important;
+}
 .empty-state {
   display: flex !important;
   flex-direction: column !important;

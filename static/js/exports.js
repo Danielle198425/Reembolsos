@@ -168,8 +168,10 @@ const ExportsPage = {
 
       this._filterAndRenderExports();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="${colSpan}"><div class="empty-state">
-        <span class="empty-icon">⚠️</span><p>Erro: ${escHtml(err.message)}</p>
+      const tableThs = document.querySelectorAll('#page-exports table thead th');
+      const errColSpan = tableThs.length > 0 ? tableThs.length : colSpan;
+      tbody.innerHTML = `<tr class="empty-state-row"><td colspan="${errColSpan}" style="text-align:center !important; width:100% !important; padding:48px 16px !important;"><div class="empty-state" style="margin:0 auto !important; width:100% !important; display:flex !important; flex-direction:column !important; align-items:center !important; justify-content:center !important; text-align:center !important;">
+        <span class="empty-icon" style="font-size:48px !important; margin:0 auto 12px auto !important; display:flex !important; align-items:center !important; justify-content:center !important; width:100% !important; text-align:center !important;">⚠️</span><p style="margin:0 auto !important; text-align:center !important; width:100% !important; font-size:15px !important; color:var(--text-4) !important;">Erro: ${escHtml(err.message)}</p>
       </div></td></tr>`;
     }
   },
@@ -221,13 +223,16 @@ const ExportsPage = {
       }
     }
 
+    const tableThs = document.querySelectorAll('#page-exports table thead th');
+    const dynamicColSpan = tableThs.length > 0 ? tableThs.length : colSpan;
+
     if (items.length === 0) {
       tbody.innerHTML = `
         <tr class="empty-state-row">
-          <td colspan="${colSpan}">
-            <div class="empty-state">
-              <span class="empty-icon">📄</span>
-              <p>Nenhum relatório encontrado</p>
+          <td colspan="${dynamicColSpan}" style="text-align:center !important; width:100% !important; padding:48px 16px !important;">
+            <div class="empty-state" style="margin:0 auto !important; width:100% !important; display:flex !important; flex-direction:column !important; align-items:center !important; justify-content:center !important; text-align:center !important;">
+              <span class="empty-icon" style="font-size:48px !important; margin:0 auto 12px auto !important; display:flex !important; align-items:center !important; justify-content:center !important; width:100% !important; text-align:center !important;">📄</span>
+              <p style="margin:0 auto !important; text-align:center !important; width:100% !important; font-size:15px !important; color:var(--text-4) !important;">Nenhum relatório encontrado</p>
             </div>
           </td>
         </tr>`;

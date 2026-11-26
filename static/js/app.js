@@ -81,34 +81,32 @@ async function applyAppLogo() {
     if (loginLogo) {
       loginLogo.innerHTML = `<img src="${logoData}" style="max-height:100%; max-width:100%; object-fit:contain; display:block; margin:auto;" alt="Moura Leite" />`;
       loginLogo.style.background = '#ffffff';
-      loginLogo.style.padding = '8px 12px';
+      loginLogo.style.padding = '4px';
       loginLogo.style.display = 'inline-flex';
       loginLogo.style.alignItems = 'center';
       loginLogo.style.justifyContent = 'center';
       loginLogo.style.borderRadius = '14px';
       loginLogo.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
-      loginLogo.style.width = 'auto';
-      loginLogo.style.height = '86px';
+      loginLogo.style.width = '52px';
+      loginLogo.style.height = '52px';
       loginLogo.style.flexShrink = '0';
     }
     const sidebarLogo = document.getElementById('sidebar-logo-mark');
     if (sidebarLogo) {
       sidebarLogo.innerHTML = `<img src="${logoData}" style="max-height:100%; max-width:100%; object-fit:contain; display:block; margin:auto;" alt="Moura Leite" />`;
       sidebarLogo.style.background = '#ffffff';
-      sidebarLogo.style.padding = '8px 14px';
+      sidebarLogo.style.padding = '4px';
       sidebarLogo.style.display = 'inline-flex';
       sidebarLogo.style.alignItems = 'center';
       sidebarLogo.style.justifyContent = 'center';
       sidebarLogo.style.borderRadius = '10px';
       sidebarLogo.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-      sidebarLogo.style.width = 'auto';
-      sidebarLogo.style.height = '56px';
+      sidebarLogo.style.width = '42px';
+      sidebarLogo.style.height = '42px';
       sidebarLogo.style.flexShrink = '0';
       
       const brandText = document.querySelector('.sidebar-brand');
-      if (brandText && logoData !== '/static/icons/logo-stacked.svg') {
-        brandText.style.display = 'none';
-      } else if (brandText) {
+      if (brandText) {
         brandText.style.display = 'block';
       }
     }
