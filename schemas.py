@@ -212,6 +212,7 @@ class ExpenseBase(BaseModel):
     has_alcohol: Optional[bool] = False
     is_duplicate: Optional[bool] = False
     audit_alerts: Optional[str] = None
+    toll_amount: Optional[float] = None
 
 
 class ExpenseCreate(ExpenseBase):
@@ -232,6 +233,7 @@ class ExpenseUpdate(BaseModel):
     has_alcohol: Optional[bool] = None
     is_duplicate: Optional[bool] = None
     audit_alerts: Optional[str] = None
+    toll_amount: Optional[float] = None
 
 
 class ExpenseOut(ExpenseBase):

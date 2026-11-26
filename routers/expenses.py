@@ -203,6 +203,15 @@ def _expense_out(e: models.Expense) -> dict:
         "is_duplicate": bool(getattr(e, 'is_duplicate', False)),
         "audit_alerts": json.loads(e.audit_alerts) if (getattr(e, 'audit_alerts', None) and str(e.audit_alerts).strip().startswith("[")) else ([e.audit_alerts] if getattr(e, 'audit_alerts', None) else []),
         "edit_history": json.loads(e.edit_history) if getattr(e, 'edit_history', None) else [],
+        "toll_amount": (
+            float(__m.group(1).replace(".", "").replace(",", "."))
+            if getattr(e, 'notes', None) and (__m := __import__('re').search(r"Pedágio:\s*(?:R\$\s*)?([\d.,]+)", e.notes or ""))
+            else (
+                float(__m2.group(1).replace(".", "").replace(",", "."))
+                if getattr(e, 'description', None) and (__m2 := __import__('re').search(r"Pedágio:\s*(?:R\$\s*)?([\d.,]+)", e.description or ""))
+                else None
+            )
+        ) if getattr(e, 'notes', None) or getattr(e, 'description', None) else None,
     }
 
 
@@ -465,15 +474,26 @@ def create_expense(
 
     final_audit_alerts = json.dumps(alerts_list, ensure_ascii=False) if alerts_list else None
 
+    # Se for despesa de quilometragem com pedágio informado, garantir detalhamento consistente na descrição e notas
+    final_description = body.description
+    final_notes = body.notes
+    if is_km and body.toll_amount is not None and body.toll_amount > 0:
+        if "Pedágio:" not in (final_description or ""):
+            toll_str = f"R$ {body.toll_amount:.2f}".replace(".", ",")
+            final_description = f"{final_description} | Pedágio: {toll_str}"
+        if "Pedágio:" not in (final_notes or ""):
+            toll_str = f"R$ {body.toll_amount:.2f}".replace(".", ",")
+            final_notes = f"{final_notes or ''} · Pedágio: {toll_str}".strip(" ·")
+
     expense = models.Expense(
         user_id=current_user.id,
         category_id=body.category_id,
         cost_center_id=body.cost_center_id,
         provider=body.provider,
-        description=body.description,
+        description=final_description,
         amount=body.amount,
         expense_date=body.expense_date,
-        notes=body.notes,
+        notes=final_notes,
         status=models.ExpenseStatus.rascunho,
         created_by_admin_id=imp_id if admin_creator else None,
         created_by_admin_name=imp_name if imp_id else None,
@@ -559,6 +579,15 @@ def update_expense(
     )
 
     update_dict = body.model_dump(exclude_none=True)
+    toll_amount_val = update_dict.pop("toll_amount", None)
+    if is_km and toll_amount_val is not None and toll_amount_val > 0:
+        curr_desc = update_dict.get("description", expense.description) or ""
+        curr_notes = update_dict.get("notes", expense.notes) or ""
+        toll_str = f"R$ {toll_amount_val:.2f}".replace(".", ",")
+        if "Pedágio:" not in curr_desc:
+            update_dict["description"] = f"{curr_desc} | Pedágio: {toll_str}"
+        if "Pedágio:" not in curr_notes:
+            update_dict["notes"] = f"{curr_notes} · Pedágio: {toll_str}".strip(" ·")
     changes = []
 
     if was_previously_approved or was_rejected:

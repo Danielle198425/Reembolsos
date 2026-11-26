@@ -238,6 +238,9 @@ def _fallback_route_osrm(
         return {
             "distance_km": round(dist_km, 2),
             "duration_min": round(dur_min, 1),
+            "has_tolls": False,
+            "toll_amount": None,
+            "toll_sections_count": 0,
             "origin": origin_name,
             "dest": dest_name,
             "origin_coords": [lat_a, lon_a],
@@ -441,6 +444,8 @@ def calculate_route(
         "api-version": "1.0",
         "travelMode": "car",
         "routeType": "fastest",
+        "sectionType": "tollRoad",
+        "report": "effectiveSettings",
         "query": f"{lat_a},{lon_a}:{lat_b},{lon_b}"
     }
 
@@ -474,6 +479,25 @@ def calculate_route(
         time_sec = summary.get("travelTimeInSeconds", 0.0)
         duration_min = time_sec / 60.0
 
+        # Detecção de pedágios (toll roads)
+        sections = routes[0].get("sections", [])
+        toll_sections = [
+            s for s in sections
+            if str(s.get("sectionType", "")).upper() in ("TOLL_ROAD", "TOLLROAD")
+        ]
+        toll_sections_count = len(toll_sections)
+
+        # Captura de valor de pedágio se fornecido pelo Azure Maps
+        toll_amount = None
+        toll_cost_val = summary.get("tollCost")
+        if toll_cost_val is not None:
+            try:
+                toll_amount = float(toll_cost_val)
+            except (ValueError, TypeError):
+                toll_amount = None
+
+        has_tolls = (toll_sections_count > 0) or (toll_amount is not None and toll_amount > 0)
+
         # Converte lista de points para coordenadas GeoJSON [lon, lat]
         coordinates = []
         for leg in routes[0].get("legs", []):
@@ -489,13 +513,19 @@ def calculate_route(
             },
             "properties": {
                 "distance_km": round(dist_km, 2),
-                "duration_min": round(duration_min, 1)
+                "duration_min": round(duration_min, 1),
+                "has_tolls": bool(has_tolls),
+                "toll_amount": toll_amount,
+                "toll_sections_count": toll_sections_count
             }
         }
 
         return {
             "distance_km": round(dist_km, 2),
             "duration_min": round(duration_min, 1),
+            "has_tolls": bool(has_tolls),
+            "toll_amount": toll_amount,
+            "toll_sections_count": toll_sections_count,
             "origin": origin,
             "dest": dest,
             "origin_coords": [lat_a, lon_a],
