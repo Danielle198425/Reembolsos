@@ -241,6 +241,7 @@ def _fallback_route_osrm(
             "has_tolls": False,
             "toll_amount": None,
             "toll_sections_count": 0,
+            "toll_points": [],
             "origin": origin_name,
             "dest": dest_name,
             "origin_coords": [lat_a, lon_a],
@@ -390,6 +391,45 @@ def reverse_geocode(lat: float, lon: float) -> Optional[Dict[str, Any]]:
         return _fallback_reverse_nominatim(lat, lon)
 
 
+def _lookup_toll_point_name(lat: float, lon: float, nearby_road: Optional[str], headers: dict) -> str:
+    """
+    Identifica o nome legível da praça/ponto de pedágio combinando o nome da rodovia
+    e a localidade (município - UF) via Azure Maps Reverse Search Address.
+    """
+    url = "https://atlas.microsoft.com/search/address/reverse/json"
+    params = {
+        "api-version": "1.0",
+        "language": "pt-BR",
+        "query": f"{lat},{lon}"
+    }
+    try:
+        resp = _get_http_session().get(url, params=params, headers=headers, timeout=2.5)
+        if resp.status_code == 200:
+            data = resp.json()
+            addrs = data.get("addresses", [])
+            if addrs:
+                addr_info = addrs[0].get("address", {})
+                street = addr_info.get("streetName") or addr_info.get("street") or nearby_road or "Rodovia"
+                muni = addr_info.get("municipality") or addr_info.get("countrySecondarySubdivision")
+                state = addr_info.get("countrySubdivision") or "SP"
+
+                # Se a rua for numérica, muito curta ou genérica, preferir o nome da instrução da rota
+                if nearby_road and (not street or street == "Rodovia" or street.isdigit() or len(street) < 3):
+                    street = nearby_road
+
+                if muni:
+                    return f"{street} ({muni} - {state})"
+                elif state:
+                    return f"{street} ({state})"
+                return street
+    except Exception as e:
+        logger.debug(f"[azure_maps] Erro ao identificar ponto de pedágio via reverse search: {e}")
+
+    if nearby_road:
+        return f"{nearby_road} (Trecho pedagiado)"
+    return f"Pedágio ({lat:.4f}, {lon:.4f})"
+
+
 def calculate_route(
     origin: str,
     dest: str,
@@ -445,6 +485,8 @@ def calculate_route(
         "travelMode": "car",
         "routeType": "fastest",
         "sectionType": "tollRoad",
+        "instructionsType": "text",
+        "language": "pt-BR",
         "report": "effectiveSettings",
         "query": f"{lat_a},{lon_a}:{lat_b},{lon_b}"
     }
@@ -498,12 +540,62 @@ def calculate_route(
 
         has_tolls = (toll_sections_count > 0) or (toll_amount is not None and toll_amount > 0)
 
+        # Identificação e extração nominal dos pontos de pedágio
+        toll_points = []
+        all_points = []
+        all_instructions = []
+        for leg in routes[0].get("legs", []):
+            all_points.extend(leg.get("points", []))
+            all_instructions.extend(leg.get("instructions", []))
+
+        if toll_sections:
+            from concurrent.futures import ThreadPoolExecutor
+            tasks = []
+            with ThreadPoolExecutor(max_workers=min(5, len(toll_sections[:10]))) as executor:
+                for idx, s in enumerate(toll_sections[:10]):
+                    start_idx = s.get("startPointIndex", 0)
+                    pt_lat, pt_lon = None, None
+                    if 0 <= start_idx < len(all_points):
+                        pt_lat = float(all_points[start_idx]["latitude"])
+                        pt_lon = float(all_points[start_idx]["longitude"])
+
+                    nearby_road = None
+                    closest_dist = float("inf")
+                    for inst in all_instructions:
+                        p_idx = inst.get("pointIndex", -1)
+                        street = inst.get("street") or inst.get("roadName")
+                        if street and p_idx >= 0:
+                            diff = abs(p_idx - start_idx)
+                            if diff < closest_dist:
+                                closest_dist = diff
+                                nearby_road = street
+
+                    if pt_lat is not None and pt_lon is not None:
+                        future = executor.submit(_lookup_toll_point_name, pt_lat, pt_lon, nearby_road, headers)
+                        tasks.append((idx, future))
+
+                results_dict = {}
+                for idx, fut in tasks:
+                    try:
+                        results_dict[idx] = fut.result(timeout=3.5)
+                    except Exception:
+                        results_dict[idx] = f"Praça de Pedágio {idx + 1}"
+
+                raw_toll_points = [results_dict[i] for i in sorted(results_dict.keys())]
+
+            # Deduplica ocorrências consecutivas idênticas
+            for p in raw_toll_points:
+                p_clean = str(p).strip()
+                if p_clean and (not toll_points or toll_points[-1].lower() != p_clean.lower()):
+                    toll_points.append(p_clean)
+
+        if toll_sections_count > 0 and not toll_points:
+            toll_points = [f"Praça de Pedágio {i+1}" for i in range(toll_sections_count)]
+
         # Converte lista de points para coordenadas GeoJSON [lon, lat]
         coordinates = []
-        for leg in routes[0].get("legs", []):
-            for pt in leg.get("points", []):
-                # pt possui 'latitude' e 'longitude'
-                coordinates.append([float(pt["longitude"]), float(pt["latitude"])])
+        for pt in all_points:
+            coordinates.append([float(pt["longitude"]), float(pt["latitude"])])
 
         geojson = {
             "type": "Feature",
@@ -516,7 +608,8 @@ def calculate_route(
                 "duration_min": round(duration_min, 1),
                 "has_tolls": bool(has_tolls),
                 "toll_amount": toll_amount,
-                "toll_sections_count": toll_sections_count
+                "toll_sections_count": toll_sections_count,
+                "toll_points": toll_points
             }
         }
 
@@ -526,6 +619,7 @@ def calculate_route(
             "has_tolls": bool(has_tolls),
             "toll_amount": toll_amount,
             "toll_sections_count": toll_sections_count,
+            "toll_points": toll_points,
             "origin": origin,
             "dest": dest,
             "origin_coords": [lat_a, lon_a],

@@ -1756,8 +1756,9 @@ const ExpensesPage = {
                 <span id="km-toll-badge" style="font-size:11px;font-weight:700;background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:12px;border:1px solid #fcd34d;">Azure Maps</span>
               </div>
               <p id="km-toll-notice" style="font-size:12px;color:#78350f;margin:0 0 8px 0;line-height:1.4;">
-                Pedágio detectado no trajeto pelo Azure Maps — informe o valor total dos pedágios (comprovante dispensado).
+                O Azure Maps identificou as praças de pedágio no trajeto, porém não possui tarifação oficial em R$ para rodovias brasileiras. Informe o valor total dos pedágios (comprovante dispensado).
               </p>
+              <div id="km-toll-points-list" style="display:none;margin:8px 0 10px 0;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #fde68a;"></div>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <div style="flex:1;min-width:140px;">
                   <label for="km-toll-input" style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:3px;display:block;">Valor do Pedágio (R$)</label>
@@ -1908,6 +1909,7 @@ const ExpensesPage = {
       // Detecção de pedágio salvo anteriormente
       let hasSavedToll = false;
       let tollUnitVal = 0;
+      let savedTollPoints = [];
       const tollDescMatch = expense.description?.match(/Pedágio:\s*(?:R\$\s*)?([\d.,]+)/i);
       const tollNotesMatch = expense.notes?.match(/Pedágio:\s*(?:R\$\s*)?([\d.,]+)/i);
       const matchedTollStr = (tollDescMatch ? tollDescMatch[1] : (tollNotesMatch ? tollNotesMatch[1] : null));
@@ -1920,11 +1922,31 @@ const ExpensesPage = {
         tollUnitVal = roundTripVal ? (expense.toll_amount / 2) : expense.toll_amount;
       }
 
+      const pointsNotesMatch = expense.notes?.match(/\[Praças:\s*(.*?)\]/i) || expense.description?.match(/\[Praças:\s*(.*?)\]/i);
+      if (pointsNotesMatch && pointsNotesMatch[1]) {
+        savedTollPoints = pointsNotesMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+      } else if (Array.isArray(expense.toll_points)) {
+        savedTollPoints = expense.toll_points;
+      }
+
       const tollCard = document.getElementById('km-toll-card');
       const tollInput = document.getElementById('km-toll-input');
+      const listEl = document.getElementById('km-toll-points-list');
       if (hasSavedToll && tollCard && tollInput) {
         tollCard.style.display = 'block';
         tollInput.value = tollUnitVal > 0 ? tollUnitVal.toFixed(2).replace('.', ',') : '';
+        if (savedTollPoints.length > 0 && listEl) {
+          listEl.innerHTML = `
+            <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:5px;display:flex;align-items:center;gap:5px;">
+              <span>📍</span>
+              <span>Praças de pedágio identificadas na rota (${savedTollPoints.length}):</span>
+            </div>
+            <ol style="margin:0;padding-left:18px;font-size:12px;color:#334155;line-height:1.5;">
+              ${savedTollPoints.map(p => `<li style="font-weight:600;">${escHtml(p)}</li>`).join('')}
+            </ol>
+          `;
+          listEl.style.display = 'block';
+        }
       }
 
 
@@ -1934,6 +1956,7 @@ const ExpensesPage = {
         isRoundTrip: roundTripVal,
         rate: rate,
         hasTolls: hasSavedToll,
+        tollPoints: savedTollPoints,
         tollUnit: tollUnitVal,
         tollTotal: roundTripVal ? (tollUnitVal * 2) : tollUnitVal,
         kmSubtotal: totalDist * rate,
@@ -2704,32 +2727,43 @@ const ExpensesPage = {
   },
 
 
-  generateRouteImage(origin, dest, distance, tollText = null) {
+  generateRouteImage(origin, dest, distance, tollText = null, tollPoints = [], isRoundTrip = false) {
+    const hasTollPoints = Array.isArray(tollPoints) && tollPoints.length > 0;
+    
+    // Altura dinâmica para acomodar a lista de praças de pedágio sem aperto visual
+    let extraHeight = 0;
+    if (tollText) extraHeight += 40;
+    if (hasTollPoints) {
+      const linesCount = Math.min(5, Math.ceil(tollPoints.length / 2));
+      extraHeight += (linesCount * 22 + 45);
+    }
+    const canvasHeight = Math.min(550, 390 + extraHeight);
+    
     const canvas = document.createElement('canvas');
     canvas.width = 600;
-    canvas.height = 400;
+    canvas.height = canvasHeight;
     const ctx = canvas.getContext('2d');
     
 
-    const grad = ctx.createLinearGradient(0, 0, 600, 400);
+    const grad = ctx.createLinearGradient(0, 0, 600, canvasHeight);
     grad.addColorStop(0, '#4F46E5');
     grad.addColorStop(1, '#06B6D4');
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 600, 400);
+    ctx.fillRect(0, 0, 600, canvasHeight);
     
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.fillRect(40, 30, 520, 340);
+    ctx.fillRect(40, 25, 520, canvasHeight - 50);
     
 
     ctx.font = 'bold 22px sans-serif';
     ctx.fillStyle = '#1e1b4b';
-    ctx.fillText('🚗 Comprovante de Km - Viagem', 60, 75);
+    ctx.fillText('🚗 Comprovante de Km - Viagem', 60, 65);
     
 
-    ctx.font = '14px sans-serif';
+    ctx.font = '13px sans-serif';
     ctx.fillStyle = '#64748b';
-    ctx.fillText('Ponto Inicial:', 60, 115);
+    ctx.fillText('Ponto Inicial:', 60, 100);
     
 
     ctx.font = 'bold 14px sans-serif';
@@ -2737,13 +2771,13 @@ const ExpensesPage = {
     const originWords = origin.split(', ');
     let originLine1 = originWords.slice(0, 3).join(', ');
     let originLine2 = originWords.slice(3).join(', ');
-    ctx.fillText(originLine1, 60, 135);
-    if (originLine2) ctx.fillText(originLine2, 60, 155);
+    ctx.fillText(originLine1, 60, 120);
+    if (originLine2) ctx.fillText(originLine2, 60, 138);
     
 
-    ctx.font = '14px sans-serif';
+    ctx.font = '13px sans-serif';
     ctx.fillStyle = '#64748b';
-    ctx.fillText('Ponto Final:', 60, 195);
+    ctx.fillText('Ponto Final:', 60, 175);
     
 
     ctx.font = 'bold 14px sans-serif';
@@ -2751,35 +2785,64 @@ const ExpensesPage = {
     const destWords = dest.split(', ');
     let destLine1 = destWords.slice(0, 3).join(', ');
     let destLine2 = destWords.slice(3).join(', ');
-    ctx.fillText(destLine1, 60, 215);
-    if (destLine2) ctx.fillText(destLine2, 60, 235);
+    ctx.fillText(destLine1, 60, 195);
+    if (destLine2) ctx.fillText(destLine2, 60, 213);
     
 
     ctx.fillStyle = '#e0e7ff';
-    ctx.fillRect(60, 265, 180, 40);
+    ctx.fillRect(60, 240, 180, 38);
     ctx.fillStyle = '#4f46e5';
     ctx.font = 'bold 16px sans-serif';
-    ctx.fillText(`${distance} km`, 80, 291);
+    ctx.fillText(`${distance} km`, 80, 265);
     
 
     ctx.strokeStyle = '#10b981';
     ctx.lineWidth = 3;
-    ctx.strokeRect(360, 265, 180, 40);
+    ctx.strokeRect(360, 240, 180, 38);
     ctx.font = 'bold 14px sans-serif';
     ctx.fillStyle = '#10b981';
-    ctx.fillText('ROTA VERIFICADA', 385, 291);
+    ctx.fillText('ROTA VERIFICADA', 385, 265);
 
+    let curY = 295;
     if (tollText) {
       ctx.fillStyle = '#fffbeb';
-      ctx.fillRect(60, 316, 480, 36);
+      ctx.fillRect(60, curY, 480, 32);
       ctx.strokeStyle = '#fde68a';
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(60, 316, 480, 36);
-      ctx.font = 'bold 12.5px sans-serif';
+      ctx.strokeRect(60, curY, 480, 32);
+      ctx.font = 'bold 12px sans-serif';
       ctx.fillStyle = '#92400e';
-      ctx.fillText(`🛣️ ${tollText} (dispensado envio de comprovante físico)`, 75, 339);
+      ctx.fillText(`🛣️ ${tollText} (dispensado envio de comprovante físico)`, 72, curY + 21);
+      curY += 40;
     }
-    
+
+    if (hasTollPoints) {
+      const linesCount = Math.min(5, Math.ceil(tollPoints.length / 2));
+      const boxHeight = linesCount * 20 + 35;
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(60, curY, 480, boxHeight);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(60, curY, 480, boxHeight);
+
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillStyle = '#334155';
+      const roundTripLabel = isRoundTrip ? ' (Ida e Volta - 2x)' : '';
+      ctx.fillText(`Praças identificadas na rota${roundTripLabel}:`, 72, curY + 20);
+
+      ctx.font = '11px sans-serif';
+      ctx.fillStyle = '#475569';
+      let ptY = curY + 38;
+      for (let i = 0; i < tollPoints.length; i += 2) {
+        const p1 = `${i + 1}. ${tollPoints[i]}`;
+        const p2 = tollPoints[i + 1] ? `  •  ${i + 2}. ${tollPoints[i + 1]}` : '';
+        const lineText = p1 + p2;
+        const truncated = lineText.length > 70 ? (lineText.substring(0, 67) + '...') : lineText;
+        ctx.fillText(truncated, 72, ptY);
+        ptY += 18;
+        if (ptY > curY + boxHeight - 6) break;
+      }
+    }
 
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   },
@@ -3211,30 +3274,57 @@ const ExpensesPage = {
       const hasTolls = Boolean(routeRes.has_tolls);
       const apiTollAmount = (routeRes.toll_amount !== null && routeRes.toll_amount !== undefined) ? parseFloat(routeRes.toll_amount) : null;
       const tollSectionsCount = routeRes.toll_sections_count || 0;
+      const tollPoints = Array.isArray(routeRes.toll_points) ? routeRes.toll_points : [];
 
       const tollCard = document.getElementById('km-toll-card');
       const tollInput = document.getElementById('km-toll-input');
       const tollNotice = document.getElementById('km-toll-notice');
       const tollBadge = document.getElementById('km-toll-badge');
+      const tollListEl = document.getElementById('km-toll-points-list');
 
       let initialTollUnit = 0;
       if (hasTolls) {
         if (tollCard) tollCard.style.display = 'block';
-        if (tollBadge && tollSectionsCount > 0) {
-          tollBadge.textContent = `${tollSectionsCount} pedágio(s) detectado(s)`;
+        if (tollBadge) {
+          const count = tollPoints.length || tollSectionsCount;
+          tollBadge.textContent = count > 0 ? `${count} pedágio(s) detectado(s)` : 'Azure Maps';
         }
+        if (tollNotice) {
+          tollNotice.textContent = 'O Azure Maps identificou as praças de pedágio no trajeto, porém não possui tarifação oficial em R$ para rodovias brasileiras. Informe o valor total dos pedágios (comprovante dispensado).';
+        }
+
+        if (tollListEl) {
+          if (tollPoints.length > 0) {
+            tollListEl.innerHTML = `
+              <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:5px;display:flex;align-items:center;gap:5px;">
+                <span>📍</span>
+                <span>Praças de pedágio identificadas na rota (${tollPoints.length}):</span>
+              </div>
+              <ol style="margin:0;padding-left:18px;font-size:12px;color:#334155;line-height:1.5;">
+                ${tollPoints.map(p => `<li style="font-weight:600;">${escHtml(p)}</li>`).join('')}
+              </ol>
+            `;
+            tollListEl.style.display = 'block';
+          } else {
+            tollListEl.style.display = 'none';
+            tollListEl.innerHTML = '';
+          }
+        }
+
         if (apiTollAmount && apiTollAmount > 0) {
           initialTollUnit = apiTollAmount;
           if (tollInput) tollInput.value = apiTollAmount.toFixed(2).replace('.', ',');
-          if (tollNotice) tollNotice.textContent = 'Pedágio detectado no trajeto pelo Azure Maps — valor sugerido pela API (ajuste se necessário, comprovante dispensado).';
         } else {
           initialTollUnit = 0;
           if (tollInput) tollInput.value = '';
-          if (tollNotice) tollNotice.textContent = 'Pedágio detectado no trajeto pelo Azure Maps — informe o valor total dos pedágios (comprovante dispensado).';
         }
       } else {
         if (tollCard) tollCard.style.display = 'none';
         if (tollInput) tollInput.value = '';
+        if (tollListEl) {
+          tollListEl.style.display = 'none';
+          tollListEl.innerHTML = '';
+        }
       }
 
       this._kmData = { 
@@ -3244,6 +3334,7 @@ const ExpensesPage = {
         rate, 
         rateName: rateInfo.name,
         hasTolls,
+        tollPoints,
         tollUnit: initialTollUnit,
         tollTotal: isRoundTrip ? (initialTollUnit * 2) : initialTollUnit,
         kmSubtotal: total,
@@ -3355,15 +3446,18 @@ const ExpensesPage = {
       amount      = parseFloat(this._kmData.total.toFixed(2));
       const roundTripText = this._kmData.isRoundTrip ? " (Ida e Volta)" : "";
       const hasTollValue = Boolean(this._kmData.hasTolls && this._kmData.tollTotal > 0);
+      const tollPointsList = (this._kmData.tollPoints && this._kmData.tollPoints.length > 0) ? this._kmData.tollPoints : [];
+      const plazasBadge = tollPointsList.length > 0 ? ` (${tollPointsList.length} pedágio${tollPointsList.length > 1 ? 's' : ''})` : "";
       const tollText = hasTollValue
-        ? ` | Pedágio: R$ ${this._kmData.tollTotal.toFixed(2).replace('.', ',')}`
+        ? ` | Pedágio: R$ ${this._kmData.tollTotal.toFixed(2).replace('.', ',')}${plazasBadge}`
         : "";
       description = `Quilometragem: ${this._kmData.origin} → ${this._kmData.dest} (${this._kmData.calcDist} km)${roundTripText}${tollText}`;
       const rateLabel = this._kmData.rateName ? ` (${this._kmData.rateName})` : '';
       const tollNotes = hasTollValue
         ? ` · KM: ${fmt(this._kmData.kmSubtotal)} + Pedágio: ${fmt(this._kmData.tollTotal)} = Total: ${fmt(this._kmData.total)}`
         : ` · Total ${this._kmData.calcDist} km`;
-      notes       = `${kmNotes} · Taxa R$ ${this._kmData.rate.toFixed(2).replace('.', ',')}/km${rateLabel}${tollNotes}`;
+      const tollPointsStr = tollPointsList.length > 0 ? ` · [Praças: ${tollPointsList.join(', ')}]` : '';
+      notes       = `${kmNotes} · Taxa R$ ${this._kmData.rate.toFixed(2).replace('.', ',')}/km${rateLabel}${tollNotes}${tollPointsStr}`;
     } else {
       let amtStr  = document.getElementById('ef-amount').value || '';
       amount      = parseFloat(amtStr.replace('R$ ', '').replace(/\\./g, '').replace(',', '.'));
@@ -3448,7 +3542,14 @@ const ExpensesPage = {
             const tollVoucherText = (this._kmData.hasTolls && this._kmData.tollTotal > 0)
               ? `Pedágio: R$ ${this._kmData.tollTotal.toFixed(2).replace('.', ',')}`
               : null;
-            const blob = await this.generateRouteImage(this._kmData.origin, this._kmData.dest, this._kmData.calcDist, tollVoucherText);
+            const blob = await this.generateRouteImage(
+              this._kmData.origin,
+              this._kmData.dest,
+              this._kmData.calcDist,
+              tollVoucherText,
+              this._kmData.tollPoints || [],
+              this._kmData.isRoundTrip
+            );
             if (blob) {
               const fileName = `mapa_viagem_${expense.id}.png`;
               expense.receipt_path = fileName;
@@ -3493,7 +3594,14 @@ const ExpensesPage = {
             const tollVoucherText = (this._kmData.hasTolls && this._kmData.tollTotal > 0)
               ? `Pedágio: R$ ${this._kmData.tollTotal.toFixed(2).replace('.', ',')}`
               : null;
-            const blob = await this.generateRouteImage(this._kmData.origin, this._kmData.dest, this._kmData.calcDist, tollVoucherText);
+            const blob = await this.generateRouteImage(
+              this._kmData.origin,
+              this._kmData.dest,
+              this._kmData.calcDist,
+              tollVoucherText,
+              this._kmData.tollPoints || [],
+              this._kmData.isRoundTrip
+            );
             if (blob) {
               const fileName = `mapa_viagem_${expense.id}.png`;
               expense.receipt_path = fileName;
