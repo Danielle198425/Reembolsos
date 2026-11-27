@@ -91,8 +91,23 @@ def create_export(
             joinedload(models.Expense.user)
         )
         if body.expense_ids:
+            # Validar que apenas despesas finalizadas ou aprovadas/aguardando_finalizacao sejam exportadas
+            invalid_exps = db.query(models.Expense).filter(
+                models.Expense.id.in_(body.expense_ids),
+                models.Expense.status.notin_([
+                    models.ExpenseStatus.finalizado,
+                    models.ExpenseStatus.aguardando_finalizacao,
+                    models.ExpenseStatus.aprovado
+                ])
+            ).all()
+            if invalid_exps:
+                invalid_desc = ", ".join(f"#{e.id} ({e.status.value if hasattr(e.status, 'value') else e.status})" for e in invalid_exps)
+                raise HTTPException(
+                    400,
+                    f"Apenas despesas com status Finalizado ou Aprovado (Aguardando Finalização) podem ser exportadas. "
+                    f"Despesas não permitidas encontradas: {invalid_desc}."
+                )
             q = q.filter(models.Expense.id.in_(body.expense_ids))
-            q = q.filter(models.Expense.status != models.ExpenseStatus.rejeitado)
         else:
             if body.date_from:
                 q = q.filter(models.Expense.expense_date >= body.date_from)
@@ -123,11 +138,12 @@ def create_export(
         from datetime import datetime
         now_utc = datetime.utcnow()
         for exp in expenses:
-            exp.status = models.ExpenseStatus.finalizado
-            if not exp.finalized_at:
-                exp.finalized_at = now_utc
-            if not exp.finalized_by:
-                exp.finalized_by = current_user.id
+            if exp.status in [models.ExpenseStatus.aguardando_finalizacao, models.ExpenseStatus.aprovado]:
+                exp.status = models.ExpenseStatus.finalizado
+                if not exp.finalized_at:
+                    exp.finalized_at = now_utc
+                if not exp.finalized_by:
+                    exp.finalized_by = current_user.id
 
         if not expenses:
             os.makedirs(EXPORT_DIR, exist_ok=True)

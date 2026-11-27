@@ -1481,6 +1481,142 @@ def send_expense_to_sienge(
         raise HTTPException(502, f"Erro na integração Sienge: {exc}")
 
 
+@router.post("/bulk-approve")
+def bulk_approve_expenses(
+    body: dict,
+    request: Request,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role not in [models.UserRole.admin, models.UserRole.financeiro, models.UserRole.aprovador]:
+        raise HTTPException(403, "Você não tem permissão para aprovar despesas.")
+
+    expense_ids = body.get("expense_ids", [])
+    if not expense_ids:
+        raise HTTPException(400, "Nenhuma despesa selecionada para aprovação.")
+
+    imp_id = getattr(current_user, '_impersonator_id', None)
+    imp_name = getattr(current_user, '_impersonator_name', None)
+    if request:
+        header_imp_id = request.headers.get("X-Impersonator-Id")
+        if not imp_id and header_imp_id:
+            try:
+                imp_id = int(header_imp_id)
+            except Exception:
+                imp_id = None
+        header_imp_name = request.headers.get("X-Impersonator-Name")
+        if not imp_name and header_imp_name:
+            imp_name = unquote(header_imp_name)
+    if imp_id:
+        admin_obj = db.query(models.User).filter(models.User.id == imp_id).first()
+        if admin_obj:
+            imp_name = admin_obj.name
+
+    expenses = db.query(models.Expense).filter(models.Expense.id.in_(expense_ids)).all()
+    if not expenses:
+        raise HTTPException(404, "Nenhuma despesa encontrada para os IDs informados.")
+
+    rules = []
+    app_cc_ids = []
+    app_func_ids = []
+    if current_user.role == models.UserRole.aprovador:
+        if getattr(current_user, 'approver_rules', None):
+            try:
+                rules = json.loads(current_user.approver_rules)
+            except Exception:
+                rules = []
+        else:
+            if current_user.approver_of:
+                try:
+                    app_cc_ids = json.loads(current_user.approver_of)
+                except Exception:
+                    app_cc_ids = []
+            if not app_cc_ids and current_user.cost_center_id:
+                app_cc_ids = [current_user.cost_center_id]
+
+            if current_user.approver_of_functions:
+                try:
+                    app_func_ids = json.loads(current_user.approver_of_functions)
+                except Exception:
+                    app_func_ids = []
+
+    now_utc = datetime.utcnow()
+    now_str = now_utc.strftime("%d/%m/%Y %H:%M")
+
+    approved_count = 0
+    skipped_count = 0
+
+    for exp in expenses:
+        if exp.status != models.ExpenseStatus.aguardando_aprovacao:
+            skipped_count += 1
+            continue
+
+        if current_user.role != models.UserRole.admin and exp.user_id == current_user.id:
+            skipped_count += 1
+            continue
+
+        if current_user.role == models.UserRole.aprovador:
+            if rules:
+                matched = False
+                if exp.user:
+                    for r in rules:
+                        f_ids = r.get("function_ids", [])
+                        d_ids = r.get("department_ids", [])
+                        f_ok = not f_ids or (exp.user.job_function_id in f_ids)
+                        d_ok = not d_ids or (exp.user.cost_center_id in d_ids or exp.cost_center_id in d_ids)
+                        if f_ok and d_ok:
+                            matched = True
+                            break
+                if not matched:
+                    skipped_count += 1
+                    continue
+            else:
+                if app_cc_ids and exp.user and (exp.user.cost_center_id not in app_cc_ids and exp.cost_center_id not in app_cc_ids):
+                    skipped_count += 1
+                    continue
+                if app_func_ids and exp.user and exp.user.job_function_id and exp.user.job_function_id not in app_func_ids:
+                    skipped_count += 1
+                    continue
+
+        exp.status = models.ExpenseStatus.aguardando_finalizacao
+        exp.approved_by = current_user.id
+        exp.approved_at = now_utc
+        exp.updated_at = now_utc
+
+        if imp_id and imp_name:
+            exp.approved_by_admin_id = imp_id
+            exp.approved_by_admin_name = imp_name
+            history_list = []
+            if getattr(exp, 'edit_history', None):
+                try:
+                    history_list = json.loads(exp.edit_history)
+                except Exception:
+                    history_list = []
+            history_list.append({
+                "date": now_str,
+                "user_name": imp_name,
+                "changes": [f"Despesa aprovada em lote pelo Administrador {imp_name} no modo 'Ver como' (simulando perfil de {current_user.name})"]
+            })
+            exp.edit_history = json.dumps(history_list)
+
+        approved_count += 1
+
+    if approved_count > 0:
+        db.commit()
+
+    msg = f"{approved_count} despesa(s) aprovada(s) com sucesso!"
+    if skipped_count > 0:
+        msg += f" ({skipped_count} despesa(s) ignorada(s) por não estarem pendentes ou fora do escopo de aprovação)."
+
+    return {
+        "success": True,
+        "approved_count": approved_count,
+        "skipped_count": skipped_count,
+        "total": len(expense_ids),
+        "message": msg
+    }
+
+
 @router.post("/bulk-send-sienge")
 def bulk_send_sienge(
     body: dict,

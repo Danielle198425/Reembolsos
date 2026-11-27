@@ -129,6 +129,7 @@ const Api = {
   submitExpense(id) { return Api.post(`/api/expenses/${id}/submit`); },
   sendExpense(id) { return Api.post(`/api/expenses/${id}/send`); },
   approveExpense(id) { return Api.post(`/api/expenses/${id}/approve`); },
+  bulkApproveExpenses(ids) { return Api.post('/api/expenses/bulk-approve', { expense_ids: ids }); },
   rejectExpense(id, reason) { return Api.post(`/api/expenses/${id}/reject`, { reason }); },
   finalizeExpense(id) { return Api.post(`/api/expenses/${id}/finalize`); },
   payExpense(id) { return Api.post(`/api/expenses/${id}/pay`); },

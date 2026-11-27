@@ -180,9 +180,8 @@ const ExpensesPage = {
         <div>
           <h1 class="page-title">Despesas</h1>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
           <button class="btn btn-primary" id="btn-new-expense">＋ Nova Despesa</button>
-          ${isAdminOrFinance ? `<button class="btn btn-secondary hide-on-mobile" id="btn-exec-report">⬇ Exportar Selecionados</button>` : ''}
         </div>
       </div>
 
@@ -228,14 +227,16 @@ const ExpensesPage = {
         </div>
 
 
-        <div class="table-header">
+        <div class="table-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <span class="table-count" id="exp-count">Carregando...</span>
             <span class="table-total" id="exp-total" style="font-size:13px;color:var(--text-3);font-weight:500;"></span>
           </div>
-          <div class="table-actions" style="display:flex;align-items:center;gap:8px;">
-            ${isAdminOrFinance ? `<button class="btn btn-sm btn-secondary hide-on-mobile" id="btn-sync-sienge-payments" title="Consultar parcelas no Sienge e atualizar para 'pago' se quitadas (PG)">🔄 Sincronizar Sienge</button>` : ''}
-            ${isAdminOrFinance ? `<button class="btn btn-sm btn-primary hide-on-mobile" id="btn-bulk-sienge">Gerar Título</button>` : ''}
+          <div class="table-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            ${(isAdminOrFinance || isApproverOrAdmin) ? `<button class="btn btn-sm btn-success" id="btn-bulk-approve" title="Aprovar despesas selecionadas">✓ Aprovar</button>` : ''}
+            ${isAdminOrFinance ? `<button class="btn btn-sm btn-secondary" id="btn-exec-report" title="Exportar despesas selecionadas">⬇ Exportar Selecionados</button>` : ''}
+            ${isAdminOrFinance ? `<button class="btn btn-sm btn-primary" id="btn-bulk-sienge" title="Gerar títulos de reembolso no Sienge">Gerar Título</button>` : ''}
+            ${isAdminOrFinance ? `<button class="btn btn-sm btn-secondary" id="btn-sync-sienge-payments" title="Consultar parcelas no Sienge e atualizar para 'pago' se quitadas (PG)">🔄 Sincronizar Sienge</button>` : ''}
             <button class="btn btn-sm btn-ghost" id="reload-expenses-btn" title="Recarregar">↻</button>
           </div>
         </div>
@@ -245,7 +246,7 @@ const ExpensesPage = {
           <table id="expenses-table" class="${isInitialCollapsed ? 'desc-collapsed' : 'desc-expanded'}">
             <thead>
               <tr>
-                ${isAdminOrFinance ? `<th style="width:36px;text-align:center;"><input type="checkbox" id="select-all-exp" /></th>` : ''}
+                ${(isAdminOrFinance || isApproverOrAdmin) ? `<th style="width:36px;text-align:center;"><input type="checkbox" id="select-all-exp" /></th>` : ''}
                 <th style="width:28px;padding:0 2px;text-align:center;"></th>
                 <th class="th-sortable" data-sort="status" style="cursor:pointer;user-select:none;" title="Ordenar por Status">
                   <div style="display:inline-flex;align-items:center;gap:4px;">
@@ -339,6 +340,7 @@ const ExpensesPage = {
     // Bind events
     document.getElementById('btn-new-expense').addEventListener('click', () => this.openForm());
     document.getElementById('reload-expenses-btn').addEventListener('click', () => this.loadExpenses());
+    document.getElementById('btn-bulk-approve')?.addEventListener('click', () => this.bulkApproveExpenses());
     document.getElementById('btn-exec-report')?.addEventListener('click', () => this.exportSelected());
     document.getElementById('btn-bulk-sienge')?.addEventListener('click', () => this.bulkSendSienge());
     document.getElementById('btn-sync-sienge-payments')?.addEventListener('click', async () => {
@@ -956,18 +958,33 @@ const ExpensesPage = {
       ? `<span title="${impAlertTooltip}" style="font-size:15px;line-height:1;cursor:help;display:inline-block;" data-tooltip="${impAlertTooltip}">👁️</span>`
       : '';
 
+    const isStatusWaitingApp = e.status === 'aguardando_aprovacao';
     const isStatusApproved = e.status === 'aprovado';
     const isStatusFinalized = e.status === 'finalizado';
     const isStatusWaitingFin = e.status === 'aguardando_finalizacao';
     const isStatusRejected = e.status === 'rejeitado';
-    const isSelectable = isStatusApproved || isStatusFinalized || isStatusWaitingFin;
-    const checkboxTitle = isStatusRejected
-      ? 'Despesas rejeitadas não podem ser selecionadas'
-      : (isStatusApproved || isStatusWaitingFin
-        ? 'Selecionar despesa para exportação / finalização'
-        : (isStatusFinalized
-          ? 'Selecionar despesa finalizada para exportação ou gerar título'
-          : 'Apenas despesas aprovadas, aguardando finalização ou finalizadas podem ser selecionadas'));
+
+    let isSelectable = false;
+    let checkboxTitle = '';
+
+    if (isApprover && !isAdminOrFinance) {
+      isSelectable = isStatusWaitingApp && !isSelf;
+      checkboxTitle = isStatusWaitingApp
+        ? (isSelf ? 'Você não pode aprovar sua própria despesa' : 'Selecionar despesa para aprovação em lote')
+        : 'Apenas despesas aguardando aprovação podem ser selecionadas';
+    } else if (isAdminOrFinance) {
+      isSelectable = isStatusWaitingApp || isStatusApproved || isStatusWaitingFin || isStatusFinalized;
+      checkboxTitle = isStatusRejected
+        ? 'Despesas rejeitadas não podem ser selecionadas'
+        : (isStatusWaitingApp
+          ? 'Selecionar despesa para aprovação em lote'
+          : (isStatusApproved || isStatusWaitingFin
+            ? 'Selecionar despesa para exportação ou finalização'
+            : (isStatusFinalized
+              ? 'Selecionar despesa finalizada para exportação ou gerar título'
+              : 'Selecionar despesa')));
+    }
+
     const checkboxDisabled = !isSelectable ? 'disabled style="cursor:not-allowed;opacity:0.35;"' : '';
     const isChecked = checkedIds && checkedIds.has(e.id);
 
@@ -991,7 +1008,7 @@ const ExpensesPage = {
 
     return `
       <tr data-id="${e.id}" class="expense-row">
-        ${isAdminOrFinance ? `<td class="col-check hide-on-mobile" style="width:36px;text-align:center;"><input type="checkbox" class="exp-checkbox" value="${e.id}" data-status="${e.status}" title="${checkboxTitle}" ${checkboxDisabled} ${isChecked ? 'checked' : ''} /></td>` : ''}
+        ${(isAdminOrFinance || isApprover) ? `<td class="col-check hide-on-mobile" style="width:36px;text-align:center;"><input type="checkbox" class="exp-checkbox" value="${e.id}" data-status="${e.status}" title="${checkboxTitle}" ${checkboxDisabled} ${isChecked ? 'checked' : ''} /></td>` : ''}
         <td class="col-alerts" style="width:36px;padding:0 2px;text-align:center;">
           <div style="display:inline-flex;align-items:center;justify-content:center;gap:2px;">
             ${auditBadge}
@@ -1799,11 +1816,12 @@ const ExpensesPage = {
           </div>
 
 
-          <button class="btn btn-secondary" type="button"
-            id="km-calc-btn"
-            style="margin-top:12px;width:100%;justify-content:center;gap:8px;">
-            🗺️ Calcular Rota (Azure Maps)
-          </button>
+          <!-- Indicador visual de carregamento da rota via Azure Maps -->
+          <div id="km-loading-indicator"
+            style="display:none;margin-top:12px;padding:10px 14px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;color:#15803d;font-size:13px;font-weight:600;align-items:center;gap:8px;justify-content:center;">
+            <span style="display:inline-block;width:14px;height:14px;border:2px solid #16a34a;border-top-color:transparent;border-radius:50%;animation:kmSpin 0.8s linear infinite;"></span>
+            <span>Calculando trajeto e pedágios automaticamente via Azure Maps...</span>
+          </div>
 
 
           <p id="km-error" style="color:var(--red);font-size:13px;margin-top:6px;"></p>
@@ -1861,8 +1879,8 @@ const ExpensesPage = {
     if (expense || opts.forceKm) this._onCategoryChange();
 
 
-    // Km calculate button
-    document.getElementById('km-calc-btn').addEventListener('click', () => this._calcularRota());
+    // Km calculate button (se presente)
+    document.getElementById('km-calc-btn')?.addEventListener('click', () => this._calcularRota());
 
 
     // Geolocation button for origin
@@ -3477,29 +3495,53 @@ const ExpensesPage = {
         dropdown.classList.add('hidden');
       }
     });
+
+    input.addEventListener('change', () => {
+      const originVal = document.getElementById('km-origin')?.value.trim();
+      const destVal = document.getElementById('km-dest')?.value.trim();
+      if (originVal && destVal && originVal.toLowerCase() !== destVal.toLowerCase()) {
+        ExpensesPage._calcularRota();
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      setTimeout(() => {
+        const originVal = document.getElementById('km-origin')?.value.trim();
+        const destVal = document.getElementById('km-dest')?.value.trim();
+        if (originVal && destVal && originVal.toLowerCase() !== destVal.toLowerCase() && !ExpensesPage._isCalculatingKmRoute) {
+          if (!ExpensesPage._kmData || ExpensesPage._kmData.origin !== originVal || ExpensesPage._kmData.dest !== destVal) {
+            ExpensesPage._calcularRota();
+          }
+        }
+      }, 250);
+    });
   },
 
 
   async _calcularRota() {
-    const origin  = document.getElementById('km-origin').value.trim();
-    const dest    = document.getElementById('km-dest').value.trim();
+    const origin  = document.getElementById('km-origin')?.value.trim();
+    const dest    = document.getElementById('km-dest')?.value.trim();
     const errEl   = document.getElementById('km-error');
+    const loadingEl = document.getElementById('km-loading-indicator');
     const calcBtn = document.getElementById('km-calc-btn');
-    errEl.textContent = '';
-
+    if (errEl) errEl.textContent = '';
 
     if (!origin || !dest) {
-      errEl.textContent = 'Preencha Ponto Inicial e Final.';
       return;
     }
     if (origin.toLowerCase() === dest.toLowerCase()) {
-      errEl.textContent = 'Ponto Inicial e Final não podem ser iguais.';
+      if (errEl) errEl.textContent = 'Ponto Inicial e Final não podem ser iguais.';
       return;
     }
 
+    if (this._isCalculatingKmRoute) return;
+    this._isCalculatingKmRoute = true;
 
-    calcBtn.disabled    = true;
-    calcBtn.textContent = '⏳ Calculando...';
+    if (loadingEl) loadingEl.style.display = 'flex';
+    if (calcBtn) {
+      calcBtn.disabled    = true;
+      calcBtn.textContent = '⏳ Calculando...';
+    }
 
 
     try {
@@ -3717,10 +3759,14 @@ const ExpensesPage = {
       toast(`Rota calculada: ${distKm.toFixed(1)} km • ${fmt(total)}`, 'success');
       this._checkDestFavoritePrompt();
     } catch (err) {
-      errEl.textContent = 'Erro ao calcular rota: ' + err.message;
+      if (errEl) errEl.textContent = 'Erro ao calcular rota: ' + err.message;
     } finally {
-      calcBtn.disabled    = false;
-      calcBtn.textContent = '🗺️ Calcular Rota (Azure Maps)';
+      this._isCalculatingKmRoute = false;
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (calcBtn) {
+        calcBtn.disabled    = false;
+        calcBtn.textContent = '🗺️ Calcular Rota (Azure Maps)';
+      }
     }
   },
 
@@ -3988,10 +4034,17 @@ const ExpensesPage = {
     const checked = checkedBoxes.map(cb => parseInt(cb.value));
     const allSelectedExps = checked.map(id => (this.loadedExpenses || []).find(e => e.id === id)).filter(Boolean);
 
-    // Permitir para exportação despesas com status aprovado ou finalizado
-    const exportableExps = allSelectedExps.filter(e => e.status === 'aprovado' || e.status === 'finalizado');
+    // Bloquear se houver despesas pendentes de aprovação ou rejeitadas
+    const invalidExps = allSelectedExps.filter(e => e.status === 'aguardando_aprovacao' || e.status === 'rejeitado' || e.status === 'rascunho' || e.status === 'a_enviar');
+    if (invalidExps.length > 0) {
+      toast('Apenas despesas aprovadas (aguardando finalização) ou finalizadas podem ser exportadas. Despesas pendentes de aprovação ou rejeitadas não podem ser incluídas.', 'warning', 5000);
+      return;
+    }
+
+    // Permitir para exportação despesas com status finalizado, aguardando_finalizacao ou aprovado
+    const exportableExps = allSelectedExps.filter(e => e.status === 'finalizado' || e.status === 'aguardando_finalizacao' || e.status === 'aprovado');
     if (exportableExps.length === 0) {
-      toast('Apenas despesas com status APROVADO ou FINALIZADO podem ser selecionadas para exportação.', 'warning');
+      toast('Apenas despesas com status Finalizado pelo Financeiro ou Aprovada (Aguardando Finalização) podem ser exportadas.', 'warning');
       return;
     }
 
@@ -3999,6 +4052,39 @@ const ExpensesPage = {
     sessionStorage.setItem('ml_export_ids', JSON.stringify(exportableIds));
     sessionStorage.setItem('ml_export_expenses', JSON.stringify(exportableExps));
     navigate('exports');
+  },
+
+  async bulkApproveExpenses() {
+    const checkedBoxes = [...document.querySelectorAll('.exp-checkbox:checked')];
+    if (checkedBoxes.length === 0) {
+      toast('Selecione ao menos uma despesa para aprovar.', 'warning');
+      return;
+    }
+    const checked = checkedBoxes.map(cb => parseInt(cb.value));
+    const allSelectedExps = checked.map(id => (this.loadedExpenses || []).find(e => e.id === id)).filter(Boolean);
+    const eligibleExps = allSelectedExps.filter(e => e.status === 'aguardando_aprovacao');
+
+    if (eligibleExps.length === 0) {
+      toast('Nenhuma das despesas selecionadas está com status "Aguardando Aprovação".', 'warning');
+      return;
+    }
+
+    const count = eligibleExps.length;
+    const confirmMsg = `Deseja aprovar ${count} despesa(s) selecionada(s)?`;
+
+    Modal.confirm('Aprovação em Lote', confirmMsg, async () => {
+      try {
+        const eligibleIds = eligibleExps.map(e => e.id);
+        const res = await Api.bulkApproveExpenses(eligibleIds);
+        toast(res.message || `${res.approved_count} despesa(s) aprovada(s) com sucesso!`, 'success');
+        this.loadExpenses();
+        if (window.DashboardPage && typeof DashboardPage.render === 'function') {
+          DashboardPage.render();
+        }
+      } catch (err) {
+        toast('Erro ao aprovar despesas em lote: ' + (err.message || err), 'error');
+      }
+    });
   },
 
   bulkSendSienge() {

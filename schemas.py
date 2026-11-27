@@ -294,6 +294,10 @@ class BulkExportEmailRequest(BaseModel):
     export_ids: List[int]
 
 
+class BulkApproveRequest(BaseModel):
+    expense_ids: List[int]
+
+
 # ─── Policy ──────────────────────────────────────────────────────────────────
 class PolicyUpdate(BaseModel):
     value: str
