@@ -595,15 +595,27 @@ def send_export_email(
             f"Moura Leite Loteamentos"
         )
 
-    send_report_email(
-        user_name=target_user.name,
-        user_email=target_user.email,
-        report_name=export.name,
-        pdf_path=export.file_path,
-        payment_info_text=payment_info_text,
-        custom_subject=email_title,
-        custom_body=email_body
-    )
+    try:
+        sent = send_report_email(
+            user_name=target_user.name,
+            user_email=target_user.email,
+            report_name=export.name,
+            pdf_path=export.file_path,
+            payment_info_text=payment_info_text,
+            custom_subject=email_title,
+            custom_body=email_body
+        )
+        if not sent:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Não foi possível enviar o e-mail para {target_user.email}. Verifique as configurações de envio."
+            )
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erro ao enviar e-mail: {exc}")
 
 
     audit = models.AuditLog(
@@ -715,15 +727,30 @@ def bulk_send_export_emails(
                 f"Moura Leite Loteamentos"
             )
 
-        send_report_email(
-            user_name=target_user.name,
-            user_email=target_user.email,
-            report_name=export.name,
-            pdf_path=export.file_path,
-            payment_info_text=payment_info_text,
-            custom_subject=email_title,
-            custom_body=email_body
-        )
+        try:
+            sent = send_report_email(
+                user_name=target_user.name,
+                user_email=target_user.email,
+                report_name=export.name,
+                pdf_path=export.file_path,
+                payment_info_text=payment_info_text,
+                custom_subject=email_title,
+                custom_body=email_body
+            )
+            if not sent:
+                failed += 1
+                errors.append(f"{export.name}: Falha no envio para {target_user.email}")
+                continue
+        except PermissionError as pe:
+            logger.error(f"Erro de permissão no envio em massa de {export.name}: {pe}")
+            failed += 1
+            errors.append(f"{export.name}: {pe}")
+            continue
+        except Exception as exc:
+            logger.error(f"Erro ao enviar e-mail de {export.name} para {target_user.email}: {exc}")
+            failed += 1
+            errors.append(f"{export.name}: {exc}")
+            continue
 
 
         export.email_sent = True

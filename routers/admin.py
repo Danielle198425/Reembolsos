@@ -2205,24 +2205,35 @@ def send_test_email_template(
 
 
     import email_service
-    if key == "closing_dates":
-        ok = email_service.send_closing_dates_email(
-            user_name=current_user.name,
-            user_email=target_email,
-            closing_date_str=sample_closing,
-            month_year_str=sample_month_year,
-            custom_subject=sub_rendered,
-            custom_body=body_rendered
-        )
-    else:
-        ok = email_service.send_report_email(
-            user_name=current_user.name,
-            user_email=target_email,
-            report_name=f"Relatório Teste ({sample_month_year})",
-            pdf_path=None,
-            payment_info_text=f"O pagamento será realizado no dia {sample_date}.",
-            custom_subject=sub_rendered,
-            custom_body=body_rendered
+    try:
+        if key == "closing_dates":
+            ok = email_service.send_closing_dates_email(
+                user_name=current_user.name,
+                user_email=target_email,
+                closing_date_str=sample_closing,
+                month_year_str=sample_month_year,
+                custom_subject=sub_rendered,
+                custom_body=body_rendered
+            )
+        else:
+            ok = email_service.send_report_email(
+                user_name=current_user.name,
+                user_email=target_email,
+                report_name=f"Relatório Teste ({sample_month_year})",
+                pdf_path=None,
+                payment_info_text=f"O pagamento será realizado no dia {sample_date}.",
+                custom_subject=sub_rendered,
+                custom_body=body_rendered
+            )
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erro ao enviar e-mail de teste: {exc}")
+
+    if not ok:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Não foi possível enviar o e-mail de teste para {target_email}. Verifique as configurações de envio."
         )
 
     _log_action(db, "TEST_EMAIL_TEMPLATE", admin=current_user, target_email=target_email,
