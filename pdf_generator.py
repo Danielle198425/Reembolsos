@@ -274,26 +274,26 @@ def generate_expense_pdf(expense, output_path: str):
     created_str = expense.created_at.strftime("%d/%m/%Y %H:%M") if expense.created_at else "-"
 
     info_data = [
-        field_row("Solicitante", expense.user.name if expense.user else "-"),
-        field_row("E-mail", expense.user.email if expense.user else "-"),
+        field_row("Solicitante", html.escape(expense.user.name) if expense.user else "-"),
+        field_row("E-mail", html.escape(expense.user.email) if expense.user else "-"),
         field_row("Data da Despesa", expense_date_str),
         field_row("Data de Criação", created_str),
-        field_row("Categoria", get_category_full_name(expense.category, expense=expense)),
-        field_row("Centro de Custo", f"{expense.cost_center.code} | {expense.cost_center.name}" if expense.cost_center else "-"),
+        field_row("Categoria", html.escape(get_category_full_name(expense.category, expense=expense))),
+        field_row("Centro de Custo", html.escape(f"{expense.cost_center.code} | {expense.cost_center.name}") if expense.cost_center else "-"),
         field_row("Valor", amount_str),
-        field_row("Descrição", expense.description),
+        field_row("Descrição", html.escape(expense.description or "-")),
     ]
 
     if expense.notes:
-        info_data.append(field_row("Observações", expense.notes))
+        info_data.append(field_row("Observações", html.escape(expense.notes)))
 
     if expense.approver:
         approved_date = expense.approved_at.strftime("%d/%m/%Y %H:%M") if expense.approved_at else "-"
-        info_data.append(field_row("Aprovado por", expense.approver.name))
+        info_data.append(field_row("Aprovado por", html.escape(expense.approver.name)))
         info_data.append(field_row("Data de Aprovação", approved_date))
 
     if expense.rejection_reason:
-        info_data.append(field_row("Motivo de Rejeição", expense.rejection_reason))
+        info_data.append(field_row("Motivo de Rejeição", html.escape(expense.rejection_reason)))
 
     info_table = Table(info_data, colWidths=[5*cm, 12*cm])
     info_table.setStyle(TableStyle([
@@ -383,9 +383,9 @@ def generate_export_pdf(expenses: list, export_name: str, output_path: str, filt
     logo_flowable = _get_logo_flowable()
 
     meta_right = Paragraph(
-        f'<font color="#1F2937" size="9"><b>De:</b> {generator_name}</font><br/>'
+        f'<font color="#1F2937" size="9"><b>De:</b> {html.escape(generator_name or "-")}</font><br/>'
         f'<font color="#1F2937" size="9"><b>Data do relatório:</b> {today_str}</font><br/>'
-        f'<font color="#1F2937" size="9"><b>ID do usuário:</b> {user_display}</font>',
+        f'<font color="#1F2937" size="9"><b>ID do usuário:</b> {html.escape(user_display or "-")}</font>',
         ParagraphStyle("header_right", alignment=TA_RIGHT, leading=14)
     )
 
@@ -400,7 +400,7 @@ def generate_export_pdf(expenses: list, export_name: str, output_path: str, filt
 
     # ── 2. Título Centralizado e Nome da Empresa logo abaixo ─────────────────
     story.append(Paragraph(
-        f'<font color="#1F2937" size="15"><b>{export_name}</b></font>',
+        f'<font color="#1F2937" size="15"><b>{html.escape(export_name or "")}</b></font>',
         ParagraphStyle("report_title_centered", alignment=TA_CENTER, leading=18)
     ))
     if company_name:
@@ -540,11 +540,11 @@ def generate_export_pdf(expenses: list, export_name: str, output_path: str, filt
 
                 row = [
                     Paragraph(f'<font color="#1F2937" size="8">{exp_counter}  {date_str}</font>', styles["Normal"]),
-                    Paragraph(f'<font color="#1F2937" size="8">{user_name}</font>', styles["Normal"]),
-                    Paragraph(f'<font color="#1F2937" size="8">{desc_text}</font>', styles["Normal"]),
-                    Paragraph(f'<font color="#1F2937" size="8">{cat_name}</font>', styles["Normal"]),
-                    Paragraph(f'<font color="#1F2937" size="8">{cc_code}</font>', styles["Normal"]),
-                    Paragraph(f'<font color="#1F2937" size="8">{status_label}</font>', styles["Normal"]),
+                    Paragraph(f'<font color="#1F2937" size="8">{html.escape(user_name)}</font>', styles["Normal"]),
+                    Paragraph(f'<font color="#1F2937" size="8">{html.escape(desc_text)}</font>', styles["Normal"]),
+                    Paragraph(f'<font color="#1F2937" size="8">{html.escape(cat_name)}</font>', styles["Normal"]),
+                    Paragraph(f'<font color="#1F2937" size="8">{html.escape(cc_code)}</font>', styles["Normal"]),
+                    Paragraph(f'<font color="#1F2937" size="8">{html.escape(status_label)}</font>', styles["Normal"]),
                     Paragraph(f'<font color="#1F2937" size="8"><b>{val_str}</b></font>', ParagraphStyle("right", alignment=TA_RIGHT)),
                 ]
                 table_data.append(row)

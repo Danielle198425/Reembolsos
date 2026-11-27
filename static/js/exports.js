@@ -82,10 +82,10 @@ const ExportsPage = {
             <span class="table-count" id="exports-count">Carregando...</span>
           </div>
           <div style="overflow-x:auto;">
-            <table>
+            <table id="exports-table">
               <thead>
                 <tr>
-                  ${(isAdminOrFinance && !isMobile) ? `<th><input type="checkbox" id="select-all-exp-exp" /></th>` : ''}
+                  ${(isAdminOrFinance && !isMobile) ? `<th style="width:40px;text-align:center;"><input type="checkbox" id="select-all-exp-exp" /></th>` : ''}
                   <th>Nome do Relatório</th>
                   <th>Gerado Por</th>
                   <th>Tipo</th>
@@ -223,13 +223,13 @@ const ExportsPage = {
       }
     }
 
-    const tableThs = document.querySelectorAll('#page-exports table thead th');
+    const tableThs = document.querySelectorAll('#exports-table thead th, #page-exports table thead th');
     const dynamicColSpan = tableThs.length > 0 ? tableThs.length : colSpan;
 
     if (items.length === 0) {
       tbody.innerHTML = `
         <tr class="empty-state-row">
-          <td colspan="${dynamicColSpan}" style="text-align:center !important; width:100% !important; padding:48px 16px !important;">
+          <td colspan="${dynamicColSpan}" style="text-align:center !important; padding:48px 16px !important;">
             <div class="empty-state" style="margin:0 auto !important; width:100% !important; display:flex !important; flex-direction:column !important; align-items:center !important; justify-content:center !important; text-align:center !important;">
               <span class="empty-icon" style="font-size:48px !important; margin:0 auto 12px auto !important; display:flex !important; align-items:center !important; justify-content:center !important; width:100% !important; text-align:center !important;">📄</span>
               <p style="margin:0 auto !important; text-align:center !important; width:100% !important; font-size:15px !important; color:var(--text-4) !important;">Nenhum relatório encontrado</p>

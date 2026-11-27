@@ -15,8 +15,13 @@ from email_service import send_report_email
 
 router = APIRouter(prefix="/api/exports", tags=["exports"])
 
-IS_VERCEL = bool(os.environ.get("VERCEL"))
+IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 EXPORT_DIR = "/tmp/exports" if (IS_VERCEL or not os.path.exists("exports")) else "exports"
+try:
+    os.makedirs(EXPORT_DIR, exist_ok=True)
+except Exception:
+    EXPORT_DIR = "/tmp/exports"
+    os.makedirs(EXPORT_DIR, exist_ok=True)
 
 
 def _make_disposition_header(raw_filename: str, inline: bool = True) -> tuple[str, str]:
@@ -79,160 +84,237 @@ def create_export(
     if current_user.role not in [models.UserRole.admin, models.UserRole.financeiro]:
         raise HTTPException(403, "Apenas administradores e financeiro podem executar relatórios.")
 
-    # Busca despesas com filtros
-    q = db.query(models.Expense).options(
-        joinedload(models.Expense.cost_center).joinedload(models.CostCenter.company),
-        joinedload(models.Expense.user)
-    )
-    if body.expense_ids:
-        q = q.filter(models.Expense.id.in_(body.expense_ids))
-        q = q.filter(models.Expense.status != models.ExpenseStatus.rejeitado)
-    else:
-        if body.date_from:
-            q = q.filter(models.Expense.expense_date >= body.date_from)
-        if body.date_to:
-            q = q.filter(models.Expense.expense_date <= body.date_to)
-        if body.status_filter:
-            statuses = body.status_filter.split(",")
-            q = q.filter(models.Expense.status.in_(statuses))
+    try:
+            # Busca despesas com filtros
+        q = db.query(models.Expense).options(
+            joinedload(models.Expense.cost_center).joinedload(models.CostCenter.company),
+            joinedload(models.Expense.user)
+        )
+        if body.expense_ids:
+            q = q.filter(models.Expense.id.in_(body.expense_ids))
+            q = q.filter(models.Expense.status != models.ExpenseStatus.rejeitado)
         else:
-            q = q.filter(models.Expense.status.in_([models.ExpenseStatus.aprovado, models.ExpenseStatus.aguardando_finalizacao, models.ExpenseStatus.finalizado]))
+            if body.date_from:
+                q = q.filter(models.Expense.expense_date >= body.date_from)
+            if body.date_to:
+                q = q.filter(models.Expense.expense_date <= body.date_to)
+            if body.status_filter:
+                statuses = body.status_filter.split(",")
+                q = q.filter(models.Expense.status.in_(statuses))
+            else:
+                q = q.filter(models.Expense.status.in_([models.ExpenseStatus.aprovado, models.ExpenseStatus.aguardando_finalizacao, models.ExpenseStatus.finalizado]))
 
-    sort_key = getattr(body, 'sort_by', None) or 'category'
-    if sort_key not in ["date", "cost_center", "category"]:
-        sort_key = "category"
+        sort_key = getattr(body, 'sort_by', None) or 'category'
+        if sort_key not in ["date", "cost_center", "category"]:
+            sort_key = "category"
 
-    if sort_key == "cost_center":
-        q = q.join(models.CostCenter, models.Expense.cost_center_id == models.CostCenter.id, isouter=True)\
-             .order_by(models.CostCenter.code.asc(), models.Expense.expense_date.asc())
-    elif sort_key == "category":
-        q = q.join(models.Category, models.Expense.category_id == models.Category.id, isouter=True)\
-             .order_by(models.Category.name.asc(), models.Expense.expense_date.asc())
-    else:
-        q = q.order_by(models.Expense.expense_date.asc(), models.Expense.id.asc())
+        if sort_key == "cost_center":
+            q = q.join(models.CostCenter, models.Expense.cost_center_id == models.CostCenter.id, isouter=True)\
+                 .order_by(models.CostCenter.code.asc(), models.Expense.expense_date.asc())
+        elif sort_key == "category":
+            q = q.join(models.Category, models.Expense.category_id == models.Category.id, isouter=True)\
+                 .order_by(models.Category.name.asc(), models.Expense.expense_date.asc())
+        else:
+            q = q.order_by(models.Expense.expense_date.asc(), models.Expense.id.asc())
 
-    expenses = q.all()
+        expenses = q.all()
 
-    # Alterar automaticamente o status das despesas para finalizado ao executar o relatório
-    from datetime import datetime
-    now_utc = datetime.utcnow()
-    for exp in expenses:
-        exp.status = models.ExpenseStatus.finalizado
-        if not exp.finalized_at:
-            exp.finalized_at = now_utc
-        if not exp.finalized_by:
-            exp.finalized_by = current_user.id
+        # Alterar automaticamente o status das despesas para finalizado ao executar o relatório
+        from datetime import datetime
+        now_utc = datetime.utcnow()
+        for exp in expenses:
+            exp.status = models.ExpenseStatus.finalizado
+            if not exp.finalized_at:
+                exp.finalized_at = now_utc
+            if not exp.finalized_by:
+                exp.finalized_by = current_user.id
 
-    if not expenses:
+        if not expenses:
+            os.makedirs(EXPORT_DIR, exist_ok=True)
+            timestamp = int(now_utc.timestamp())
+            file_basename = f"exportacao_{timestamp}.pdf"
+            abs_filepath = os.path.join(EXPORT_DIR, file_basename)
+            rel_filename = f"exports/{file_basename}"
+            generate_export_pdf(expenses, body.name, abs_filepath, generator_name=current_user.name, view_mode=sort_key)
+            if storage.enabled():
+                try:
+                    storage.upload_file(rel_filename, abs_filepath)
+                except Exception as st_err:
+                    print(f"[exports] aviso ao enviar storage: {st_err}")
+            export = models.Export(
+                name=body.name,
+                created_by=current_user.id,
+                target_user_id=None,
+                expense_user_ids=None,
+                export_type="Padrão",
+                file_path=rel_filename,
+            )
+            db.add(export)
+            db.commit()
+            db.refresh(export)
+            res = _export_dict(export)
+            res["exports"] = [_export_dict(export)]
+            res["count"] = 1
+            return res
+
+        # Obter empresa padrão Moura Leite caso algum centro de custo não tenha empresa explicitamente vinculada
+        ml_comp = db.query(models.Company).filter(models.Company.code == '1').first()
+        if not ml_comp:
+            ml_comp = db.query(models.Company).filter(models.Company.name.ilike('%MOURA LEITE DESENVOLVIMENTO%')).first()
+        default_comp_name = ml_comp.name if ml_comp else "MOURA LEITE DESENVOLVIMENTO E URBANIZAÇÃO LTDA"
+
+        from collections import OrderedDict
+        is_mass = (getattr(body, 'export_mode', None) == "massa")
+
+        # Obter mês atual em português (independente da data da despesa)
+        MONTHS_PT = {
+            1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+            5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+            9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+        }
+        now_local = datetime.now()
+        default_month_str = f"{MONTHS_PT[now_local.month]} de {now_local.year}"
+
         os.makedirs(EXPORT_DIR, exist_ok=True)
         timestamp = int(now_utc.timestamp())
-        file_basename = f"exportacao_{timestamp}.pdf"
-        abs_filepath = os.path.join(EXPORT_DIR, file_basename)
-        rel_filename = f"exports/{file_basename}"
-        generate_export_pdf(expenses, body.name, abs_filepath, generator_name=current_user.name, view_mode=sort_key)
-        if storage.enabled():
-            storage.upload_file(rel_filename, abs_filepath)
-        export = models.Export(
-            name=body.name,
-            created_by=current_user.id,
-            target_user_id=None,
-            expense_user_ids=None,
-            export_type="Padrão",
-            file_path=rel_filename,
-        )
-        db.add(export)
-        db.commit()
-        db.refresh(export)
-        res = _export_dict(export)
-        res["exports"] = [_export_dict(export)]
-        res["count"] = 1
-        return res
+        created_exports = []
 
-    # Obter empresa padrão Moura Leite caso algum centro de custo não tenha empresa explicitamente vinculada
-    ml_comp = db.query(models.Company).filter(models.Company.code == '1').first()
-    if not ml_comp:
-        ml_comp = db.query(models.Company).filter(models.Company.name.ilike('%MOURA LEITE DESENVOLVIMENTO%')).first()
-    default_comp_name = ml_comp.name if ml_comp else "MOURA LEITE DESENVOLVIMENTO E URBANIZAÇÃO LTDA"
+        if is_mass:
+            # Extrai o sufixo de mês/ano informado no campo do formulário
+            month_year_suffix = default_month_str
+            raw_name = (body.name or "").strip()
+            if " - " in raw_name:
+                parts = raw_name.split(" - ", 1)
+                if parts[1].strip():
+                    month_year_suffix = parts[1].strip()
+            elif raw_name and not any(ph in raw_name for ph in ["[Nome", "Usuário", "{"]):
+                month_year_suffix = raw_name
 
-    from collections import OrderedDict
-    is_mass = (getattr(body, 'export_mode', None) == "massa")
+            # Agrupar por usuário e, dentro de cada usuário, por empresa
+            user_groups = OrderedDict()
+            for exp in expenses:
+                uid = exp.user_id or 0
+                u = exp.user
+                u_name = u.name if u else "Usuário"
+                if uid not in user_groups:
+                    user_groups[uid] = {
+                        "user": u,
+                        "user_name": u_name,
+                        "companies": OrderedDict()
+                    }
 
-    # Obter mês atual em português (independente da data da despesa)
-    MONTHS_PT = {
-        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
-        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
-        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
-    }
-    now_local = datetime.now()
-    default_month_str = f"{MONTHS_PT[now_local.month]} de {now_local.year}"
+                comp = exp.cost_center.company if (exp.cost_center and exp.cost_center.company) else None
+                if comp:
+                    c_key = f"comp_{comp.id}"
+                    c_name = comp.name
+                else:
+                    c_key = f"comp_{ml_comp.id}" if ml_comp else "comp_default"
+                    c_name = default_comp_name
 
-    os.makedirs(EXPORT_DIR, exist_ok=True)
-    timestamp = int(now_utc.timestamp())
-    created_exports = []
+                if c_key not in user_groups[uid]["companies"]:
+                    user_groups[uid]["companies"][c_key] = {
+                        "company_name": c_name,
+                        "company": comp,
+                        "expenses": []
+                    }
+                user_groups[uid]["companies"][c_key]["expenses"].append(exp)
 
-    if is_mass:
-        # Extrai o sufixo de mês/ano informado no campo do formulário
-        month_year_suffix = default_month_str
-        raw_name = (body.name or "").strip()
-        if " - " in raw_name:
-            parts = raw_name.split(" - ", 1)
-            if parts[1].strip():
-                month_year_suffix = parts[1].strip()
-        elif raw_name and not any(ph in raw_name for ph in ["[Nome", "Usuário", "{"]):
-            month_year_suffix = raw_name
+            file_idx = 1
+            for uid, u_data in user_groups.items():
+                u_name = u_data["user_name"]
+                user_comps = u_data["companies"]
 
-        # Agrupar por usuário e, dentro de cada usuário, por empresa
-        user_groups = OrderedDict()
-        for exp in expenses:
-            uid = exp.user_id or 0
-            u = exp.user
-            u_name = u.name if u else "Usuário"
-            if uid not in user_groups:
-                user_groups[uid] = {
-                    "user": u,
-                    "user_name": u_name,
-                    "companies": OrderedDict()
-                }
+                # Nome base do relatório do usuário: Nome do Usuário - Mês e Ano
+                base_user_report = f"{u_name} - {month_year_suffix}"
 
-            comp = exp.cost_center.company if (exp.cost_center and exp.cost_center.company) else None
-            if comp:
-                c_key = f"comp_{comp.id}"
-                c_name = comp.name
-            else:
-                c_key = f"comp_{ml_comp.id}" if ml_comp else "comp_default"
-                c_name = default_comp_name
+                for c_key, c_data in user_comps.items():
+                    g_expenses = c_data["expenses"]
+                    g_comp_name = c_data["company_name"]
 
-            if c_key not in user_groups[uid]["companies"]:
-                user_groups[uid]["companies"][c_key] = {
-                    "company_name": c_name,
-                    "company": comp,
-                    "expenses": []
-                }
-            user_groups[uid]["companies"][c_key]["expenses"].append(exp)
+                    # Sempre inclui o nome da empresa no relatório para padronização e identificação visual na tela
+                    export_record_name = f"{base_user_report} - {g_comp_name}"
 
-        file_idx = 1
-        for uid, u_data in user_groups.items():
-            u_name = u_data["user_name"]
-            user_comps = u_data["companies"]
+                    file_basename = f"exportacao_{timestamp}_{file_idx}.pdf"
+                    rel_filename = f"exports/{file_basename}"
+                    abs_filepath = os.path.join(EXPORT_DIR, file_basename)
+                    file_idx += 1
 
-            # Nome base do relatório do usuário: Nome do Usuário - Mês e Ano
-            base_user_report = f"{u_name} - {month_year_suffix}"
+                    generate_export_pdf(
+                        g_expenses,
+                        base_user_report,
+                        abs_filepath,
+                        generator_name=current_user.name,
+                        company_name=g_comp_name,
+                        view_mode=sort_key
+                    )
 
-            for c_key, c_data in user_comps.items():
-                g_expenses = c_data["expenses"]
-                g_comp_name = c_data["company_name"]
+                    if storage.enabled():
+                        try:
+                            storage.upload_file(rel_filename, abs_filepath)
+                        except Exception as st_err:
+                            print(f"[exports] aviso ao enviar storage: {st_err}")
 
-                # Sempre inclui o nome da empresa no relatório para padronização e identificação visual na tela
-                export_record_name = f"{base_user_report} - {g_comp_name}"
+                    export = models.Export(
+                        name=export_record_name,
+                        created_by=current_user.id,
+                        target_user_id=uid if uid else None,
+                        expense_user_ids=json.dumps([uid]) if uid else None,
+                        export_type="Massa",
+                        file_path=rel_filename,
+                    )
+                    db.add(export)
+                    db.commit()
+                    db.refresh(export)
 
-                file_basename = f"exportacao_{timestamp}_{file_idx}.pdf"
+                    for exp in g_expenses:
+                        exp.export_id = export.id
+                    db.commit()
+
+                    created_exports.append(export)
+        else:
+            # Modo Individual: agrupa apenas por empresa mantendo o nome fornecido
+            groups = OrderedDict()
+            for exp in expenses:
+                comp = exp.cost_center.company if (exp.cost_center and exp.cost_center.company) else None
+                if comp:
+                    c_key = f"comp_{comp.id}"
+                    c_name = comp.name
+                else:
+                    c_key = f"comp_{ml_comp.id}" if ml_comp else "comp_default"
+                    c_name = default_comp_name
+
+                if c_key not in groups:
+                    groups[c_key] = {
+                        "company_name": c_name,
+                        "company": comp,
+                        "expenses": []
+                    }
+                groups[c_key]["expenses"].append(exp)
+
+            multiple_groups = len(groups) > 1
+            for idx, (group_key, g_data) in enumerate(groups.items(), start=1):
+                g_expenses = g_data["expenses"]
+                g_comp_name = g_data["company_name"]
+
+                exp_user_ids = list(set([exp.user_id for exp in g_expenses if getattr(exp, 'user_id', None)]))
+                target_uid = exp_user_ids[0] if exp_user_ids else None
+
+                if multiple_groups:
+                    export_record_name = f"{body.name} - {g_comp_name}"
+                    file_basename = f"exportacao_{timestamp}_{idx}.pdf"
+                else:
+                    if g_comp_name and g_comp_name.lower() not in body.name.lower():
+                        export_record_name = f"{body.name} - {g_comp_name}"
+                    else:
+                        export_record_name = body.name
+                    file_basename = f"exportacao_{timestamp}.pdf"
+
                 rel_filename = f"exports/{file_basename}"
                 abs_filepath = os.path.join(EXPORT_DIR, file_basename)
-                file_idx += 1
 
                 generate_export_pdf(
                     g_expenses,
-                    base_user_report,
+                    body.name,
                     abs_filepath,
                     generator_name=current_user.name,
                     company_name=g_comp_name,
@@ -240,14 +322,17 @@ def create_export(
                 )
 
                 if storage.enabled():
-                    storage.upload_file(rel_filename, abs_filepath)
+                    try:
+                        storage.upload_file(rel_filename, abs_filepath)
+                    except Exception as st_err:
+                        print(f"[exports] aviso ao enviar storage: {st_err}")
 
                 export = models.Export(
                     name=export_record_name,
                     created_by=current_user.id,
-                    target_user_id=uid if uid else None,
-                    expense_user_ids=json.dumps([uid]) if uid else None,
-                    export_type="Massa",
+                    target_user_id=target_uid,
+                    expense_user_ids=json.dumps(exp_user_ids) if exp_user_ids else None,
+                    export_type="Padrão",
                     file_path=rel_filename,
                 )
                 db.add(export)
@@ -259,81 +344,36 @@ def create_export(
                 db.commit()
 
                 created_exports.append(export)
-    else:
-        # Modo Individual: agrupa apenas por empresa mantendo o nome fornecido
-        groups = OrderedDict()
-        for exp in expenses:
-            comp = exp.cost_center.company if (exp.cost_center and exp.cost_center.company) else None
-            if comp:
-                c_key = f"comp_{comp.id}"
-                c_name = comp.name
-            else:
-                c_key = f"comp_{ml_comp.id}" if ml_comp else "comp_default"
-                c_name = default_comp_name
 
-            if c_key not in groups:
-                groups[c_key] = {
-                    "company_name": c_name,
-                    "company": comp,
-                    "expenses": []
-                }
-            groups[c_key]["expenses"].append(exp)
-
-        multiple_groups = len(groups) > 1
-        for idx, (group_key, g_data) in enumerate(groups.items(), start=1):
-            g_expenses = g_data["expenses"]
-            g_comp_name = g_data["company_name"]
-
-            exp_user_ids = list(set([exp.user_id for exp in g_expenses if getattr(exp, 'user_id', None)]))
-            target_uid = exp_user_ids[0] if exp_user_ids else None
-
-            if multiple_groups:
-                export_record_name = f"{body.name} - {g_comp_name}"
-                file_basename = f"exportacao_{timestamp}_{idx}.pdf"
-            else:
-                if g_comp_name and g_comp_name.lower() not in body.name.lower():
-                    export_record_name = f"{body.name} - {g_comp_name}"
-                else:
-                    export_record_name = body.name
-                file_basename = f"exportacao_{timestamp}.pdf"
-
-            rel_filename = f"exports/{file_basename}"
-            abs_filepath = os.path.join(EXPORT_DIR, file_basename)
-
-            generate_export_pdf(
-                g_expenses,
-                body.name,
-                abs_filepath,
-                generator_name=current_user.name,
-                company_name=g_comp_name,
-                view_mode=sort_key
-            )
-
-            if storage.enabled():
-                storage.upload_file(rel_filename, abs_filepath)
-
-            export = models.Export(
-                name=export_record_name,
-                created_by=current_user.id,
-                target_user_id=target_uid,
-                expense_user_ids=json.dumps(exp_user_ids) if exp_user_ids else None,
-                export_type="Padrão",
-                file_path=rel_filename,
-            )
-            db.add(export)
-            db.commit()
-            db.refresh(export)
-
-            for exp in g_expenses:
-                exp.export_id = export.id
-            db.commit()
-
-            created_exports.append(export)
-
-    res = _export_dict(created_exports[0])
-    res["exports"] = [_export_dict(e) for e in created_exports]
-    res["count"] = len(created_exports)
-    return res
+        res = _export_dict(created_exports[0])
+        res["exports"] = [_export_dict(e) for e in created_exports]
+        res["count"] = len(created_exports)
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        err_msg = str(e).lower()
+        if "column" in err_msg or "relation" in err_msg or "undefined" in err_msg:
+            try:
+                from sqlalchemy import text
+                from database import engine, IS_SQLITE
+                if not IS_SQLITE:
+                    with engine.begin() as conn:
+                        conn.execute(text("""
+                            ALTER TABLE exports ADD COLUMN IF NOT EXISTS target_user_id INTEGER REFERENCES users(id);
+                            ALTER TABLE exports ADD COLUMN IF NOT EXISTS expense_user_ids TEXT;
+                            ALTER TABLE exports ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE;
+                            ALTER TABLE exports ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP;
+                            ALTER TABLE expenses ADD COLUMN IF NOT EXISTS export_id INTEGER REFERENCES exports(id);
+                            ALTER TABLE expenses ADD COLUMN IF NOT EXISTS finalized_by INTEGER REFERENCES users(id);
+                            ALTER TABLE expenses ADD COLUMN IF NOT EXISTS finalized_at TIMESTAMP;
+                        """))
+            except Exception as ddl_err:
+                print(f"[export] auto-ddl error: {ddl_err}")
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar relatório: {str(e)}")
 
 
 @router.get("/{export_id}/download")

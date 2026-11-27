@@ -86,13 +86,37 @@ def run_auto_migrations(force: bool = False):
     # reduzindo o tempo de inicialização de ~8s para milissegundos.
     if IS_VERCEL and not force and os.environ.get("FORCE_MIGRATIONS") != "1":
         try:
-            with engine.connect() as conn:
+            with engine.begin() as conn:
                 chk = conn.execute(text("SELECT 1 FROM users LIMIT 1;"))
                 if chk.fetchone() is not None:
+                    # Executa rapidamente DDL essencial com IF NOT EXISTS para colunas críticas
+                    if not IS_SQLITE:
+                        conn.execute(text("""
+                            ALTER TABLE exports ADD COLUMN IF NOT EXISTS target_user_id INTEGER REFERENCES users(id);
+                            ALTER TABLE exports ADD COLUMN IF NOT EXISTS expense_user_ids TEXT;
+                            ALTER TABLE exports ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE;
+                            ALTER TABLE exports ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP;
+                            ALTER TABLE expenses ADD COLUMN IF NOT EXISTS export_id INTEGER REFERENCES exports(id);
+                            ALTER TABLE expenses ADD COLUMN IF NOT EXISTS finalized_by INTEGER REFERENCES users(id);
+                            ALTER TABLE expenses ADD COLUMN IF NOT EXISTS finalized_at TIMESTAMP;
+                            CREATE TABLE IF NOT EXISTS user_saved_addresses (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                                address TEXT NOT NULL,
+                                label VARCHAR(100),
+                                is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
+                                toll_items TEXT,
+                                toll_total DOUBLE PRECISION,
+                                last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                            );
+                            ALTER TABLE user_saved_addresses ADD COLUMN IF NOT EXISTS toll_items TEXT;
+                            ALTER TABLE user_saved_addresses ADD COLUMN IF NOT EXISTS toll_total DOUBLE PRECISION;
+                        """))
                     _MIGRATIONS_APPLIED = True
                     return
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[migration] fast migration error on Vercel: {e}")
 
     _MIGRATIONS_APPLIED = True
     # Garante a criação de todas as tabelas mapeadas no SQLAlchemy (ex: user_saved_addresses)

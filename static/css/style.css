@@ -1223,8 +1223,13 @@ tbody td {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
+#exports-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+}
 tbody tr.empty-state-row td,
-#page-exports tbody tr.empty-state-row td {
+#page-exports tbody tr.empty-state-row td,
+#exports-table tbody tr.empty-state-row td {
   text-align: center !important;
   vertical-align: middle !important;
   padding: 48px 16px !important;
@@ -2542,6 +2547,43 @@ tbody tr.empty-state-row td,
 }
 
 @media (min-width: 769px) {
+  #exports-table,
+  #page-exports table {
+    display: table !important;
+    width: 100% !important;
+    table-layout: auto !important;
+  }
+  #exports-table thead,
+  #page-exports thead {
+    display: table-header-group !important;
+  }
+  #exports-table tbody,
+  #page-exports tbody {
+    display: table-row-group !important;
+  }
+  #exports-table tbody tr.empty-state-row,
+  #page-exports tbody tr.empty-state-row {
+    display: table-row !important;
+    width: 100% !important;
+  }
+  #exports-table tbody tr.empty-state-row td,
+  #page-exports tbody tr.empty-state-row td {
+    display: table-cell !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    padding: 48px 16px !important;
+  }
+  #exports-table tbody tr.empty-state-row td .empty-state,
+  #page-exports tbody tr.empty-state-row td .empty-state {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+  }
+
   .mobile-bottom-nav {
     display: none !important;
   }
