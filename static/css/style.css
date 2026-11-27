@@ -2802,6 +2802,100 @@ tbody tr.empty-state-row td,
   color: var(--text-1);
 }
 
+/* ── Praças de Pedágio no Modal Nova Despesa (Layout Responsivo) ────────── */
+.km-toll-plaza-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #fef3c7;
+  width: 100%;
+  box-sizing: border-box;
+}
+.km-toll-plaza-row:last-child {
+  border-bottom: none;
+}
+.km-toll-plaza-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #1e293b;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.km-toll-plaza-idx {
+  color: #b45309;
+  font-weight: 700;
+}
+.km-toll-plaza-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  width: 130px;
+  justify-content: flex-end;
+  box-sizing: border-box;
+}
+.km-toll-plaza-input-wrap .km-toll-prefix {
+  font-size: 12px;
+  font-weight: 700;
+  color: #92400e;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.km-toll-plaza-input-wrap .km-toll-item-input {
+  width: 90px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1.5px solid #f59e0b;
+  background: #fff;
+  text-align: right;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.km-toll-plaza-input-wrap .km-toll-item-input:focus {
+  border-color: #d97706;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+@media (max-width: 640px) {
+  .km-toll-plaza-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    padding: 10px 0 !important;
+  }
+  .km-toll-plaza-name {
+    width: 100% !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+    flex: none !important;
+  }
+  .km-toll-plaza-input-wrap {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+  }
+  .km-toll-plaza-input-wrap .km-toll-prefix {
+    flex-shrink: 0 !important;
+    font-size: 13px !important;
+  }
+  .km-toll-plaza-input-wrap .km-toll-item-input {
+    flex: 1 !important;
+    width: 100% !important;
+    max-width: 160px !important;
+    text-align: left !important;
+    padding: 7px 12px !important;
+    font-size: 14px !important;
+  }
+}
+
 
 
 

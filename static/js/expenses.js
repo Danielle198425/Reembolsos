@@ -1987,13 +1987,13 @@ const ExpensesPage = {
               <span>Praças identificadas na rota (${savedPlazaValues.length}):</span>
             </div>
             ${savedPlazaValues.map((p, idx) => `
-              <div class="km-toll-plaza-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #fef3c7;">
-                <div style="flex:1;min-width:0;font-size:12.5px;color:#1e293b;font-weight:600;line-height:1.35;">
-                  <span style="color:#b45309;font-weight:700;">${idx + 1}.</span> ${escHtml(p.name)}
+              <div class="km-toll-plaza-row">
+                <div class="km-toll-plaza-name">
+                  <span class="km-toll-plaza-idx">${idx + 1}.</span> ${escHtml(p.name)}
                 </div>
-                <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
-                  <span style="font-size:12px;font-weight:600;color:#92400e;">R$</span>
-                  <input type="text" class="km-toll-item-input" data-index="${idx}" placeholder="0,00" value="${p.value > 0 ? p.value.toFixed(2).replace('.', ',') : ''}" style="width:85px;font-size:13px;font-weight:700;color:#1e293b;padding:5px 8px;border-radius:6px;border:1px solid #f59e0b;background:#fff;text-align:right;" />
+                <div class="km-toll-plaza-input-wrap">
+                  <span class="km-toll-prefix">R$</span>
+                  <input type="text" class="km-toll-item-input" data-index="${idx}" placeholder="0,00" value="${p.value > 0 ? p.value.toFixed(2).replace('.', ',') : ''}" />
                 </div>
               </div>
             `).join('')}
@@ -3593,13 +3593,13 @@ const ExpensesPage = {
                 ${hasRestoredFav ? `<span style="font-size:11px;font-weight:700;color:#15803d;background:#dcfce7;border:1px solid #86efac;padding:1px 7px;border-radius:12px;margin-left:auto;">Valores restaurados do favorito ⭐</span>` : ''}
               </div>
               ${plazaValues.map((p, idx) => `
-                <div class="km-toll-plaza-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #fef3c7;">
-                  <div style="flex:1;min-width:0;font-size:12.5px;color:#1e293b;font-weight:600;line-height:1.35;">
-                    <span style="color:#b45309;font-weight:700;">${idx + 1}.</span> ${escHtml(p.name)}
+                <div class="km-toll-plaza-row">
+                  <div class="km-toll-plaza-name">
+                    <span class="km-toll-plaza-idx">${idx + 1}.</span> ${escHtml(p.name)}
                   </div>
-                  <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
-                    <span style="font-size:12px;font-weight:600;color:#92400e;">R$</span>
-                    <input type="text" class="km-toll-item-input" data-index="${idx}" placeholder="0,00" value="${p.value > 0 ? p.value.toFixed(2).replace('.', ',') : ''}" style="width:85px;font-size:13px;font-weight:700;color:#1e293b;padding:5px 8px;border-radius:6px;border:1px solid #f59e0b;background:#fff;text-align:right;" />
+                  <div class="km-toll-plaza-input-wrap">
+                    <span class="km-toll-prefix">R$</span>
+                    <input type="text" class="km-toll-item-input" data-index="${idx}" placeholder="0,00" value="${p.value > 0 ? p.value.toFixed(2).replace('.', ',') : ''}" />
                   </div>
                 </div>
               `).join('')}
